@@ -1,5 +1,5 @@
 # import the Flask library
-from flask import Flask, render_template, request
+from flask import Flask, request, jsonify
 import subprocess
 
 
@@ -14,6 +14,13 @@ app = Flask(__name__)
 @app.route("/")
 def hello_world():
     return "Hello World"
+
+
+@app.route("/pushtest", methods=["POST"])
+def pushtest():
+    data = request.json
+    print(f"Received message: {data['message']}")
+    return jsonify({"status": "success", "message": "Message received"}), 200
 
 
 # main driver function
