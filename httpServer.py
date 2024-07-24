@@ -19,6 +19,8 @@ def startTunnel():
 def pushtest():
     data = request.json
     images = data.get("images", [])
+    user_name = data.get("userName", "unknown")
+    print(user_name)
 
     if not os.path.exists(UPLOAD_FOLDER):
         os.makedirs(UPLOAD_FOLDER)
