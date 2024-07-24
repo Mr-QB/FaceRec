@@ -1,22 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:gallery_saver/gallery_saver.dart';
+// import 'package:gallery_saver/gallery_saver.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
+import "package:path_provider/path_provider.dart";
+// import 'package:path/path.dart' as path;
 import 'dart:io';
 // import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
+// import 'dart:typed_data';
 import 'galleryScreen.dart';
-import 'imageSetScreen.dart';
+// import 'imageSetScreen.dart';
 import 'config.dart';
 
 class CameraScreen extends StatefulWidget {
-  final List<CameraDescription> cameras;
-  CameraScreen({required this.cameras});
+  final String userName;
+  // final List<CameraDescription> cameras;
+  CameraScreen({required this.userName});
 
   @override
   _CameraScreenState createState() => _CameraScreenState();
@@ -28,15 +29,16 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isUsingFrontCamera = false;
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
   List<File> _capturedImagesFiles = []; // Lưu các tệp ảnh
+  late List<CameraDescription> _cameras;
   int _currentStep = 0;
-  late Directory _appDir;
+  // late Directory _appDir;
   List<Rect> boundingBoxes = [];
   Timer? _timer;
 
   final List<String> _instructions = [
     'Look Straight',
-    'Turn Left',
-    'Turn Right',
+    // 'Turn Left',
+    // 'Turn Right',
     'Look Up',
     'Look Down'
   ];
@@ -44,9 +46,24 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeCameraController(widget.cameras[0]);
-    _initializeAppDir();
+    _initializeCameras();
+    // _initializeAppDir();
     _startTimer();
+  }
+
+  Future<void> _initializeCameras() async {
+    _cameras = await availableCameras();
+
+    final frontCamera = _cameras.firstWhere(
+      (camera) => camera.lensDirection == CameraLensDirection.front,
+      orElse: () => _cameras[0],
+    );
+
+    _controller = CameraController(
+      frontCamera,
+      ResolutionPreset.high,
+    );
+    _initializeControllerFuture = _controller.initialize();
   }
 
   void _startTimer() {
@@ -55,9 +72,9 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  void _initializeAppDir() async {
-    _appDir = await getApplicationDocumentsDirectory();
-  }
+  // void _initializeAppDir() async {
+  //   _appDir = await getApplicationDocumentsDirectory();
+  // }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
@@ -85,7 +102,7 @@ class _CameraScreenState extends State<CameraScreen> {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'images': base64Images}),
+        body: jsonEncode({'images': base64Images, 'userName': widget.userName}),
       );
       if (response.statusCode == 200) {
         print('Images uploaded successfully');
@@ -95,10 +112,6 @@ class _CameraScreenState extends State<CameraScreen> {
     } catch (e) {
       print('Error: $e');
     }
-  }
-
-  Future<Uint8List> _readImageAsBytes(File file) async {
-    return await file.readAsBytes();
   }
 
   @override
@@ -114,10 +127,7 @@ class _CameraScreenState extends State<CameraScreen> {
       print("Camera initialized");
 
       final image = await _controller.takePicture();
-      print("Picture taken: ${image.path}");
-
       final imageFile = File(image.path);
-      _capturedImagesFiles.add(imageFile);
 
       final faces = await _detectFaces(image);
       boundingBoxes = _getBoundingBox(faces);
@@ -126,6 +136,7 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (faceDetected) {
         _currentStep++;
+        _capturedImagesFiles.add(imageFile);
         if (_currentStep >= _instructions.length) {
           await _sendImagesToServer(_capturedImagesFiles);
           _timer?.cancel();
@@ -148,26 +159,6 @@ class _CameraScreenState extends State<CameraScreen> {
     } catch (e) {
       print(e);
     }
-  }
-
-  Future<void> _saveImagesToFolder(List<String> images) async {
-    final folderName = DateTime.now().millisecondsSinceEpoch.toString();
-    final folder = Directory(path.join(_appDir.path, folderName));
-    await folder.create();
-
-    for (var imagePath in images) {
-      final fileName = path.basename(imagePath);
-      final newImagePath = path.join(folder.path, fileName);
-      final imageFile = File(imagePath);
-      await imageFile.copy(newImagePath);
-      await GallerySaver.saveImage(newImagePath);
-    }
-
-    // Save folder path globally
-    ImagePathManager().folders.add(folder.path);
-
-    _capturedImagesFiles.clear();
-    _currentStep = 0;
   }
 
   Future<List<Face>> _detectFaces(XFile image) async {
@@ -209,12 +200,13 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _switchCamera() {
-    final cameraDescription =
-        _isUsingFrontCamera ? widget.cameras[0] : widget.cameras[1];
-    setState(() {
-      _isUsingFrontCamera = !_isUsingFrontCamera;
-      _initializeCameraController(cameraDescription);
-    });
+    if (_cameras.isNotEmpty) {
+      final cameraDescription = _isUsingFrontCamera ? _cameras[1] : _cameras[0];
+      setState(() {
+        _isUsingFrontCamera = !_isUsingFrontCamera;
+        _initializeCameraController(cameraDescription);
+      });
+    }
   }
 
   @override

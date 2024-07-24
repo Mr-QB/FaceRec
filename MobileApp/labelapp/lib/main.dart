@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'cameraScreen.dart';
 import 'galleryScreen.dart';
-import 'package:http/http.dart' as http;
+import 'userNameScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,6 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: HomeScreen(cameras: cameras),
-      // home: HomeScreen2(),
     );
   }
 }
@@ -47,7 +46,7 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CameraScreen(cameras: cameras),
+                    builder: (context) => UserNamePage(),
                   ),
                 );
               },
@@ -69,35 +68,3 @@ class HomeScreen extends StatelessWidget {
     );
   }
 }
-
-// class HomeScreen2 extends StatelessWidget {
-//   Future<void> _sendPostRequest() async {
-//     const url = 'https://httptest.onlyfan.vn/pushtest';
-//     final response = await http.post(
-//       Uri.parse(url),
-//       headers: {'Content-Type': 'application/json'},
-//       body: '{"message": "Hello, this is a test message!"}',
-//     );
-
-//     if (response.statusCode == 200) {
-//       print('Request successful');
-//     } else {
-//       print('Request failed with status: ${response.statusCode}');
-//     }
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(
-//         title: Text('HTTP POST Request Example'),
-//       ),
-//       body: Center(
-//         child: ElevatedButton(
-//           onPressed: _sendPostRequest,
-//           child: Text('Send POST Request'),
-//         ),
-//       ),
-//     );
-//   }
-// }
