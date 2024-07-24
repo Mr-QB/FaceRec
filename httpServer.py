@@ -7,6 +7,8 @@ from IPython.display import display, Image
 
 app = Flask(__name__)
 
+UPLOAD_FOLDER = "uploads"
+
 
 def startTunnel():
     command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
@@ -18,8 +20,18 @@ def pushtest():
     data = request.json
     images = data.get("images", [])
 
+    if not os.path.exists(UPLOAD_FOLDER):
+        os.makedirs(UPLOAD_FOLDER)
+
     for i, img_data in enumerate(images):
         img_bytes = base64.b64decode(img_data)
+
+        # Save image to file
+        file_path = os.path.join(UPLOAD_FOLDER, f"image_{i}.png")
+        with open(file_path, "wb") as img_file:
+            img_file.write(img_bytes)
+
+        # Display image
         display(Image(data=img_bytes, format="png"))
 
     print(f"Received {len(images)} images")
