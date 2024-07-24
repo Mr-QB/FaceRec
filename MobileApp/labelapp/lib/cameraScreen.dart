@@ -1,17 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-// import 'package:gallery_saver/gallery_saver.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
-import "package:path_provider/path_provider.dart";
-// import 'package:path/path.dart' as path;
 import 'dart:io';
-// import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-// import 'dart:typed_data';
 import 'galleryScreen.dart';
-// import 'imageSetScreen.dart';
 import 'config.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -28,10 +22,9 @@ class _CameraScreenState extends State<CameraScreen> {
   late Future<void> _initializeControllerFuture;
   bool _isUsingFrontCamera = false;
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
-  List<File> _capturedImagesFiles = []; // Lưu các tệp ảnh
+  List<File> _capturedImagesFiles = [];
   late List<CameraDescription> _cameras;
   int _currentStep = 0;
-  // late Directory _appDir;
   List<Rect> boundingBoxes = [];
   Timer? _timer;
 
@@ -47,23 +40,26 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     super.initState();
     _initializeCameras();
-    // _initializeAppDir();
     _startTimer();
   }
 
   Future<void> _initializeCameras() async {
-    _cameras = await availableCameras();
+    try {
+      _cameras = await availableCameras();
 
-    final frontCamera = _cameras.firstWhere(
-      (camera) => camera.lensDirection == CameraLensDirection.front,
-      orElse: () => _cameras[0],
-    );
+      if (_cameras.isNotEmpty) {
+        final frontCamera = _cameras.firstWhere(
+          (camera) => camera.lensDirection == CameraLensDirection.front,
+          orElse: () => _cameras[0],
+        );
 
-    _controller = CameraController(
-      frontCamera,
-      ResolutionPreset.high,
-    );
-    _initializeControllerFuture = _controller.initialize();
+        _initializeCameraController(frontCamera);
+      } else {
+        print("No cameras available.");
+      }
+    } catch (e) {
+      print('Error initializing cameras: $e');
+    }
   }
 
   void _startTimer() {
@@ -71,10 +67,6 @@ class _CameraScreenState extends State<CameraScreen> {
       _takePicture(context);
     });
   }
-
-  // void _initializeAppDir() async {
-  //   _appDir = await getApplicationDocumentsDirectory();
-  // }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
