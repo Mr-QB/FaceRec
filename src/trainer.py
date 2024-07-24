@@ -1,10 +1,10 @@
 from arcface import ArcFace
-from .utility import checkAndDownloaFile
 import os
-from src.setting import *
 import cv2
 import pandas as pd
 from src.faceDetect import FaceDetector
+from .utility import checkAndDownloaFile
+from src.setting import *
 
 
 class Trainer:

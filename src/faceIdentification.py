@@ -2,8 +2,8 @@ import numpy as np
 import os
 from arcface import ArcFace
 from configparser import ConfigParser
-from .setting import *
 import pandas as pd
+from .setting import *
 from .utility import *
 from .setting import *
 from .AntiSpoofing.antiSpoofing import AntiSpoofing
