@@ -2,8 +2,6 @@ from flask import Flask, request, jsonify
 import base64
 import os
 import subprocess
-import matplotlib.pyplot as plt
-import numpy as np
 from io import BytesIO
 from IPython.display import display, Image
 
