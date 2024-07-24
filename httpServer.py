@@ -12,12 +12,7 @@ def startTunnel():
 app = Flask(__name__)
 
 
-@app.route("/")
-def hello_world():
-    return "Hello World"
-
-
-@app.route("/pushtest", methods=["POST"])
+@app.route("/pushimage", methods=["POST"])
 def pushtest():
     data = request.json
     images = data.get("images", [])

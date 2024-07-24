@@ -5,9 +5,10 @@ import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
-import 'dart:ui' as ui;
+// import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'dart:typed_data';
 import 'galleryScreen.dart';
 import 'imageSetScreen.dart';
@@ -30,6 +31,7 @@ class _CameraScreenState extends State<CameraScreen> {
   int _currentStep = 0;
   late Directory _appDir;
   List<Rect> boundingBoxes = [];
+  Timer? _timer;
 
   final List<String> _instructions = [
     'Look Straight',
@@ -44,6 +46,13 @@ class _CameraScreenState extends State<CameraScreen> {
     super.initState();
     _initializeCameraController(widget.cameras[0]);
     _initializeAppDir();
+    _startTimer();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+      _takePicture(context);
+    });
   }
 
   void _initializeAppDir() async {
@@ -108,7 +117,7 @@ class _CameraScreenState extends State<CameraScreen> {
       print("Picture taken: ${image.path}");
 
       final imageFile = File(image.path);
-      _capturedImagesFiles.add(imageFile); // Lưu ảnh vào danh sách
+      _capturedImagesFiles.add(imageFile);
 
       final faces = await _detectFaces(image);
       boundingBoxes = _getBoundingBox(faces);
@@ -117,17 +126,17 @@ class _CameraScreenState extends State<CameraScreen> {
 
       if (faceDetected) {
         _currentStep++;
-        if (_currentStep < _instructions.length) {
-          setState(() {});
-        } else {
-          await _sendImagesToServer(
-              _capturedImagesFiles); // Gửi ảnh đến máy chủ
+        if (_currentStep >= _instructions.length) {
+          await _sendImagesToServer(_capturedImagesFiles);
+          _timer?.cancel();
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => GalleryScreen(),
             ),
           );
+        } else {
+          setState(() {});
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
