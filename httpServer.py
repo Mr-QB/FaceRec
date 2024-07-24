@@ -1,5 +1,6 @@
-# import the Flask library
 from flask import Flask, request, jsonify
+import base64
+import os
 import subprocess
 
 
@@ -19,8 +20,18 @@ def hello_world():
 @app.route("/pushtest", methods=["POST"])
 def pushtest():
     data = request.json
-    print(f"Received message: {data['message']}")
-    return jsonify({"status": "success", "message": "Message received"}), 200
+    images = data.get("images", [])
+
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+
+    for i, img_data in enumerate(images):
+        img_bytes = base64.b64decode(img_data)
+        with open(f"uploads/image_{i}.png", "wb") as img_file:
+            img_file.write(img_bytes)
+
+    print(f"Received {len(images)} images")
+    return jsonify({"status": "success", "message": "Images received"}), 200
 
 
 # main driver function
