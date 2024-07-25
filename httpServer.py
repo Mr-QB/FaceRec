@@ -27,12 +27,9 @@ class FlaskApp:
         @self.app.route("/pushimages", methods=["POST"])
         def pushtest():
             data = request.json
+            print(data)
             images = data.get("images", [])
             user_name = data.get("userName", "unknown")
-            print(user_name)
-
-            if not os.path.exists(self.UPLOAD_FOLDER):
-                os.makedirs(self.UPLOAD_FOLDER)
 
             for i, img_data in enumerate(images):
                 img_bytes = base64.b64decode(img_data)
@@ -45,7 +42,7 @@ class FlaskApp:
                                 "message": "Face cannot be detected in the image",
                             }
                         ),
-                        200,
+                        201,
                     )
 
                 # Display image
