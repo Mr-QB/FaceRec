@@ -21,7 +21,8 @@ class Trainer:
         self._loadData()
 
     def _embebdding(self, image):
-        faces_cropped, x, y = self.face_detector.deteprintct_face(image)
+        print("Embebding face.....")
+        faces_cropped, x, y = self.face_detector.detect_face(image)
         if len(faces_cropped) > 0:
             return self.face_rec.calc_emb(faces_cropped[0])
         else:
@@ -36,6 +37,7 @@ class Trainer:
         if face_embedding:
             new_row = {"label": label, "embedding": face_embedding}
             self.face_data = self.face_data._append(new_row, ignore_index=True)
+
         else:
             return False
 
