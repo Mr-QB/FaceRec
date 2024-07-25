@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 import base64
-import os
 import subprocess
-from io import BytesIO
+import numpy as np
+import cv2
 from src.trainer import Trainer
 
 
@@ -32,9 +32,10 @@ class FlaskApp:
             user_name = data.get("userName", "unknown")
 
             for i, img_data in enumerate(images):
-                img_bytes = base64.b64decode(img_data)
+                np_array = np.frombuffer(img_data, np.uint8)
+                image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
 
-                if not self.trainer.addNewData(user_name, img_bytes):
+                if not self.trainer.addNewData(user_name, image):
                     return (
                         jsonify(
                             {
