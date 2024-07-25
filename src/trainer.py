@@ -35,6 +35,7 @@ class Trainer:
     def addNewData(self, label, image):
         face_embedding = self._embebdding(image)
         if face_embedding:
+            print("add new data")
             new_row = {"label": label, "embedding": face_embedding}
             self.face_data = self.face_data._append(new_row, ignore_index=True)
 
