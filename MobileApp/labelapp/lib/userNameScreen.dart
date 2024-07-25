@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:camera/camera.dart';
 import 'cameraScreen.dart';
 
 class UserNamePage extends StatefulWidget {
+  final List<CameraDescription> cameras; // Thêm tham số cameras
+
+  UserNamePage({required this.cameras});
+
   @override
   _UserNamePageState createState() => _UserNamePageState();
 }
@@ -15,7 +20,11 @@ class _UserNamePageState extends State<UserNamePage> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CameraScreen(userName: userName),
+          builder: (context) => CameraScreen(
+            userName: userName,
+            cameras:
+                widget.cameras, // Truyền danh sách cameras vào CameraScreen
+          ),
         ),
       );
     } else {
