@@ -16,7 +16,7 @@ class FlaskApp:
         self.trainer = Trainer()
         self.last_request_time = None
         self.inactivity_timeout = 30
-        self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
+        self.inactivity_timer = Timer(self.inactivity_timeout, self.trainer.clear)
 
     def _startTunnel(self):
         # command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
