@@ -7,8 +7,8 @@ from sklearn import svm
 import joblib
 from sklearn.preprocessing import LabelEncoder
 from src.faceDetect import FaceDetector
-from .utility import checkAndDownloaFile
 from src.setting import *
+from .utility import checkAndDownloaFile
 
 
 class Trainer:

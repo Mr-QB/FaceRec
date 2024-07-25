@@ -22,7 +22,5 @@ FACEDATA = "faceData/face_data.h5"
 SVM_FACE_MODEL_PATH = "faceData/svm_face_model.joblib"
 MAXIMUM_DISTANCE = 999
 FACE_VERIFY_THRESHOLD = 0.85
-PI_TO_DEG = 180
-
-
 MONGODB = "mongodb://localhost:27017/"
+PI_TO_DEG = 180
