@@ -10,16 +10,26 @@ class FlaskApp:
     def __init__(self):
         self.app = Flask(__name__)
         self.UPLOAD_FOLDER = "uploads"
-        self.setup_routes()
+        self._setupRoutes()
         self.trainer = Trainer()
         self.face_data = []
 
-    def start_tunnel(self):
+    def _startTunnel(self):
         # command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
         command = "autossh -M 0 -o ServerAliveInterval=60  -N -R  5001:localhost:5001 ubuntu@54.252.209.12 -i ec2_key.pem"
         subprocess.Popen(command, shell=True)
 
-    def setup_routes(self):
+    def _loadImageFromBytes(self, image_bytes):
+        np_array = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError(
+                "Image could not be decoded. Check if the image bytes are correct."
+            )
+
+        return image
+
+    def _setupRoutes(self):
         @self.app.route("/status", methods=["GET"])
         def status():
             return "Running..."
@@ -32,8 +42,8 @@ class FlaskApp:
             user_name = data.get("userName", "unknown")
 
             for i, img_data in enumerate(images):
-                np_array = np.frombuffer(img_data, np.uint8)
-                image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+                img_bytes = base64.b64decode(img_data)
+                image = self._loadImageFromBytes(img_bytes)
 
                 if not self.trainer.addNewData(user_name, image):
                     return (
@@ -51,7 +61,7 @@ class FlaskApp:
             return jsonify({"status": "success", "message": "Images received"}), 200
 
     def run(self):
-        self.start_tunnel()
+        self._startTunnel()
         self.app.run(host="0.0.0.0", port=5001)
 
 
