@@ -32,13 +32,13 @@ class Trainer:
     def _loadData(self):
         self.face_data = pd.read_hdf(self.face_data_path, key="df")
 
-        def addNewData(self, label, image):
-            face_embedding = self._embebdding(image)
-            if not isinstance(face_embedding, bool):
-                print("add new data")
-                new_row = {"label": label, "embedding": face_embedding}
-                self.face_data = self.face_data._append(new_row, ignore_index=True)
-
+    def addNewData(self, label, image):
+        face_embedding = self._embebdding(image)
+        if not isinstance(face_embedding, bool):
+            print("add new data")
+            new_row = {"label": label, "embedding": face_embedding}
+            self.face_data = self.face_data._append(new_row, ignore_index=True)
+            return True
         else:
             return False
 
