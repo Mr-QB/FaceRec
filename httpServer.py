@@ -20,6 +20,10 @@ class FlaskApp:
         subprocess.Popen(command, shell=True)
 
     def setup_routes(self):
+        @self.app.route("/pushimages", methods=["GET"])
+        def status():
+            return "Running"
+
         @self.app.route("/pushimages", methods=["POST"])
         def pushtest():
             data = request.json
