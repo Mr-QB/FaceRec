@@ -34,12 +34,16 @@ class Trainer:
 
     def addNewData(self, label, image, image_id):
         face_embedding = self._embebdding(image)
+        print("adding")
         if not isinstance(face_embedding, bool):
             if "imageID" not in self.face_data.columns:
+                print("add col")
                 self.face_data["imageID"] = pd.Series(dtype="str")
             if not self.face_data["imageID"].isin([image_id]).any():
+                print("haved")
                 return False
             else:
+                print("add")
                 new_row = {
                     "label": label,
                     "embedding": face_embedding,
