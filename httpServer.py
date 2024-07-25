@@ -4,43 +4,56 @@ import os
 import subprocess
 from io import BytesIO
 from IPython.display import display, Image
-
-app = Flask(__name__)
-
-UPLOAD_FOLDER = "uploads"
+from src.trainer import Trainer
 
 
-def startTunnel():
-    command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
-    subprocess.Popen(command, shell=True)
+class FlaskApp:
+    def __init__(self):
+        self.app = Flask(__name__)
+        self.UPLOAD_FOLDER = "uploads"
+        self.setup_routes()
+        self.trainer = Trainer()
+        self.face_data = []
 
+    def start_tunnel(self):
+        command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
+        subprocess.Popen(command, shell=True)
 
-@app.route("/pushimages", methods=["POST"])
-def pushtest():
-    data = request.json
-    images = data.get("images", [])
-    user_name = data.get("userName", "unknown")
-    print(user_name)
+    def setup_routes(self):
+        @self.app.route("/pushimages", methods=["POST"])
+        def pushtest():
+            data = request.json
+            images = data.get("images", [])
+            user_name = data.get("userName", "unknown")
 
-    if not os.path.exists(UPLOAD_FOLDER):
-        os.makedirs(UPLOAD_FOLDER)
+            if not os.path.exists(self.UPLOAD_FOLDER):
+                os.makedirs(self.UPLOAD_FOLDER)
 
-    for i, img_data in enumerate(images):
-        img_bytes = base64.b64decode(img_data)
+            for i, img_data in enumerate(images):
+                img_bytes = base64.b64decode(img_data)
 
-        # Save image to file
-        file_path = os.path.join(UPLOAD_FOLDER, f"image_{i}.png")
-        with open(file_path, "wb") as img_file:
-            img_file.write(img_bytes)
+                if not self.trainer.addNewData(user_name, img_bytes):
+                    return (
+                        jsonify(
+                            {
+                                "status": "false",
+                                "message": "Face cannot be detected in the image",
+                            }
+                        ),
+                        200,
+                    )
 
-        # Display image
-        display(Image(data=img_bytes, format="png"))
+                # Display image
+                display(Image(data=img_bytes, format="png"))
 
-    print(f"Received {len(images)} images")
-    return jsonify({"status": "success", "message": "Images received"}), 200
+            return jsonify({"status": "success", "message": "Images received"}), 200
+
+    def run(self):
+        self.start_tunnel()
+        self.app.run(host="0.0.0.0")
 
 
 # main driver function
 if __name__ == "__main__":
-    startTunnel()
-    app.run(host="0.0.0.0")
+    my_app = FlaskApp()
+    my_app.run()
