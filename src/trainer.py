@@ -32,6 +32,10 @@ class Trainer:
     def _loadData(self):
         self.face_data = pd.read_hdf(self.face_data_path, key="df")
 
+    def clear(self):
+        self._loadData(self)
+        print("clear data train")
+
     def addNewData(self, label, image, image_id):
         face_embedding = self._embebdding(image)
         print("adding")
