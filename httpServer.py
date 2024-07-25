@@ -76,6 +76,15 @@ class FlaskApp:
                 print(f"Error: {e}")
                 return jsonify({"status": "false", "message": str(e)}), 500
 
+        @self.app.route("/trainning", methods=["POST"])
+        def trainningSvmModel():
+            data = request.json
+            if data.get("status", False):
+                return (
+                    jsonify({"status": "success", "message": "Successful training"}),
+                    200,
+                )
+
     def clear(self):
         print("Clearing data due to inactivity...")
         self.trainer.clear()

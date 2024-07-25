@@ -33,7 +33,7 @@ class Trainer:
         self.face_data = pd.read_hdf(self.face_data_path, key="df")
 
     def clear(self):
-        self._loadData(self)
+        self._loadData()
 
     def addNewData(self, label, image, image_id):
         face_embedding = self._embebdding(image)
@@ -76,3 +76,5 @@ class Trainer:
         model.fit(X, y)
 
         self.combined_model = {"model": model, "label_encoder": label_encoder}
+
+        self._saveData()
