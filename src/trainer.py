@@ -34,7 +34,6 @@ class Trainer:
 
     def clear(self):
         self._loadData(self)
-        print("clear data train")
 
     def addNewData(self, label, image, image_id):
         face_embedding = self._embebdding(image)
