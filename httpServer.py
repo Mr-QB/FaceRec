@@ -29,6 +29,7 @@ class FlaskApp:
             data = request.json
             images = data.get("images", [])
             user_name = data.get("userName", "unknown")
+            print(user_name)
 
             if not os.path.exists(self.UPLOAD_FOLDER):
                 os.makedirs(self.UPLOAD_FOLDER)
