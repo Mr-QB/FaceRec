@@ -37,13 +37,13 @@ class FlaskApp:
         @self.app.route("/pushimages", methods=["POST"])
         def pushtest():
             data = request.json
-            print(data)
             images = data.get("images", [])
             user_name = data.get("userName", "unknown")
 
             for i, img_data in enumerate(images):
                 img_bytes = base64.b64decode(img_data)
                 image = self._loadImageFromBytes(img_bytes)
+                print("image: ", i)
 
                 if not self.trainer.addNewData(user_name, image):
                     return (
