@@ -40,7 +40,7 @@ class FlaskApp:
             image_data = data.get("images", "")
             user_name = data.get("userName", "unknown")
             image_id = data.get("imageID", "unknown")
-            print(image_data)
+            print(image_id)
 
             if not image_data:
                 return (
