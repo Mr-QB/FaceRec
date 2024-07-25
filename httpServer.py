@@ -3,7 +3,6 @@ import base64
 import os
 import subprocess
 from io import BytesIO
-from IPython.display import display, Image
 from src.trainer import Trainer
 
 
@@ -45,7 +44,6 @@ class FlaskApp:
                     )
 
                 # Display image
-                display(Image(data=img_bytes, format="png"))
 
             return jsonify({"status": "success", "message": "Images received"}), 200
 
