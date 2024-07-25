@@ -37,13 +37,19 @@ class FlaskApp:
         @self.app.route("/pushimages", methods=["POST"])
         def pushtest():
             data = request.json
-            images = data.get("images", [])
+            image_data = data.get("images", "")
             user_name = data.get("userName", "unknown")
 
-            for i, img_data in enumerate(images):
-                img_bytes = base64.b64decode(img_data)
+            if not image_data:
+                return (
+                    jsonify({"status": "false", "message": "No image data provided"}),
+                    400,
+                )
+
+            try:
+                img_bytes = base64.b64decode(image_data)
                 image = self._loadImageFromBytes(img_bytes)
-                print("image: ", i)
+                print("Received image")
 
                 if not self.trainer.addNewData(user_name, image):
                     return (
@@ -53,12 +59,13 @@ class FlaskApp:
                                 "message": "Face cannot be detected in the image",
                             }
                         ),
-                        201,
+                        400,
                     )
 
-                # Display image
-
-            return jsonify({"status": "success", "message": "Images received"}), 200
+                return jsonify({"status": "success", "message": "Image received"}), 200
+            except Exception as e:
+                print(f"Error: {e}")
+                return jsonify({"status": "false", "message": str(e)}), 500
 
     def run(self):
         self._startTunnel()
