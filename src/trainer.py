@@ -21,10 +21,11 @@ class Trainer:
         self._loadData()
 
     def _embebdding(self, image):
-        faces_cropped, x, y = self.face_detector.detect_face(image)
+        faces_cropped, x, y = self.face_detector.deteprintct_face(image)
         if len(faces_cropped) > 0:
             return self.face_rec.calc_emb(faces_cropped[0])
         else:
+            print("not faces")
             return False
 
     def _loadData(self):
