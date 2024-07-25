@@ -32,12 +32,20 @@ class Trainer:
     def _loadData(self):
         self.face_data = pd.read_hdf(self.face_data_path, key="df")
 
-    def addNewData(self, label, image):
+    def addNewData(self, label, image, image_id):
         face_embedding = self._embebdding(image)
         if not isinstance(face_embedding, bool):
-            print("add new data")
-            new_row = {"label": label, "embedding": face_embedding}
-            self.face_data = self.face_data._append(new_row, ignore_index=True)
+            if "imageID" not in self.face_data.columns:
+                self.face_data["imageID"] = pd.Series(dtype="str")
+            if not self.face_data["imageID"].isin([image_id]).any():
+                return False
+            else:
+                new_row = {
+                    "label": label,
+                    "embedding": face_embedding,
+                    "imageID": image_id,
+                }
+                self.face_data = self.face_data._append(new_row, ignore_index=True)
             return True
         else:
             return False
