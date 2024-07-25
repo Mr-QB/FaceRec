@@ -15,7 +15,7 @@ class FlaskApp:
         self._setupRoutes()
         self.trainer = Trainer()
         self.last_request_time = time.time()
-        self.inactivity_timeout = 30
+        self.inactivity_timeout = 15
         self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
         self.inactivity_timer.start()
 
@@ -78,7 +78,7 @@ class FlaskApp:
 
     def clear(self):
         print("Clearing data due to inactivity...")
-        self.face_data.clear()
+        self.trainer.clear()
 
     def reset_inactivity_timer(self):
         if self.inactivity_timer.is_alive():
