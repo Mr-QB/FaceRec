@@ -72,6 +72,9 @@ class Trainer:
         )
         labels = self.face_data["label"].tolist()
 
+        print(embeddings)
+        print(labels)
+
         label_encoder = LabelEncoder()
         labels_encoded = label_encoder.fit_transform(labels)
 
