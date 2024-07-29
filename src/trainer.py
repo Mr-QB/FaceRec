@@ -78,3 +78,4 @@ class Trainer:
         self.combined_model = {"model": model, "label_encoder": label_encoder}
 
         self._saveData()
+        return True
