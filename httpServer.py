@@ -79,6 +79,7 @@ class FlaskApp:
         @self.app.route("/trainning", methods=["POST"])
         def trainningSvmModel():
             data = request.json
+            print()
             if data.get("status", False):
                 return (
                     jsonify({"status": "success", "message": "Successful training"}),
