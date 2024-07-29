@@ -97,7 +97,7 @@ class FlaskApp:
 
     def run(self):
         self._startTunnel()
-        self.app.run(host="0.0.0.0", port=5001)
+        self.app.run(host="0.0.0.0", port=5000)
 
 
 # main driver function
