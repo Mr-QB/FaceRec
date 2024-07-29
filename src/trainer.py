@@ -61,7 +61,13 @@ class Trainer:
     def train(self):
         embeddings = (
             self.face_data["embedding"]
-            .apply(lambda x: np.fromstring(x[1:-1], sep=","))
+            .apply(
+                lambda x: (
+                    np.fromstring(str(x)[1:-1], sep=",")
+                    if isinstance(x, list)
+                    else np.fromstring(x[1:-1], sep=",")
+                )
+            )
             .tolist()
         )
         labels = self.face_data["label"].tolist()
