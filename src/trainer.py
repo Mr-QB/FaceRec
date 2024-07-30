@@ -26,7 +26,7 @@ class Trainer:
         self._loadData()
 
     def _embebdding(self, image):
-        faces_cropped, x, y = self.face_detector.detect_face(image)
+        faces_cropped, x, y = self.face_detector.getFaceAligneded(image)
         if len(faces_cropped) > 0:
             return self.face_rec.calc_emb(faces_cropped[0])
         else:
