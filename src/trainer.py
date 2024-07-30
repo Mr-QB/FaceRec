@@ -34,7 +34,6 @@ class Trainer:
             self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
             # index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
             # self.face_data = self.face_data.drop(index_to_drop)
-            print(self.face_data)
         except (FileNotFoundError, KeyError):
             self.face_data = pd.DataFrame(columns=["label", "embedding", "imageID"])
 
@@ -73,6 +72,7 @@ class Trainer:
             self.face_data["embedding"].apply(lambda x: np.array(x).flatten()).tolist()
         )
         labels = self.face_data["label"].tolist()
+        print(labels)
 
         label_encoder = LabelEncoder()
         labels_encoded = label_encoder.fit_transform(labels)
