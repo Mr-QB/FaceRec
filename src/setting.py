@@ -18,9 +18,9 @@ ARCFACE_MODEL_PATH = "models/model.tflite"
 ARCFACE_MODEL_URL = (
     "https://www.digidow.eu/f/datasets/arcface-tensorflowlite/model.tflite"
 )
-OC_SVM_FACE_MODEL_PATH = "models/oc_svm_face_model.pkl"
+# OC_SVM_FACE_MODEL_PATH = "models/oc_svm_face_model.pkl"
 FACEDATA = "faceData/face_data.pkl"
-LR_FACE_MODEL_PATH = "models/svm_face_model.pkl"
+LR_FACE_MODEL_PATH = "models/lr_face_model.pkl"
 MAXIMUM_DISTANCE = 999
 FACE_VERIFY_THRESHOLD = 0.7
 MONGODB = "mongodb://localhost:27017/"
