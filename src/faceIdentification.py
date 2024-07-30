@@ -20,15 +20,13 @@ class FaceIdentifier:
         self.threshold = FACE_VERIFY_THRESHOLD
         # self.anti_spoofing = AntiSpoofing()
         self._loadModel()
-        self.oc_svm_model_path = None
+        self.oc_lr_model_path = None
 
     def _loadModel(self):
-        with open(SVM_FACE_MODEL_PATH, "rb") as f:
+        with open(LR_FACE_MODEL_PATH, "rb") as f:
             self.combined_model = pickle.load(f)
-        self.svm_model = self.combined_model["model"]
+        self.lr_model = self.combined_model["model"]
         self.label_encoder = self.combined_model["label_encoder"]
-        with open(OC_SVM_FACE_MODEL_PATH, "rb") as f:
-            self.oc_svm_model = pickle.load(f)
 
     # Load an image and resize it
     def _embedImage(self, image: np.ndarray):
@@ -40,16 +38,14 @@ class FaceIdentifier:
         # if self.anti_spoofing.check(image) == 0:
         if True:
             image_embedding = self._embedImage(image)
-            # Check if the image is an outlier using OneClassSVM
-            is_outlier = self.oc_svm_model.predict(image_embedding)
-            if is_outlier == -1:  # -1 indicates anomaly in OneClassSVM
-                return "Anomaly detected"
 
-            name = self.svm_model.predict(image_embedding)
-            name = self.label_encoder.inverse_transform(name)[0]
+            proba = self.lr_model.predict_proba(image_embedding)[0]
+            print(proba)
+            if np.max(proba) < self.threshold:
+                return "Unknown"
+            else:
+                name = self.lr_model.classes_[np.argmax(proba)]
+                return self.label_encoder.inverse_transform([name])[0]
 
-            # if name is not None:
-            return name
-            # return "Unable to identify"
         else:
             return "Fake images"

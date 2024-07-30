@@ -17,7 +17,8 @@ import 'config.dart';
 
 class CameraScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
-  CameraScreen({required this.cameras});
+  final String userName;
+  CameraScreen({required this.userName, required this.cameras});
 
   @override
   _CameraScreenState createState() => _CameraScreenState();
@@ -86,7 +87,7 @@ class _CameraScreenState extends State<CameraScreen> {
         },
         body: jsonEncode({
           'images': base64Image,
-          'userName': "widget.userName",
+          'userName': widget.userName,
           'imageID': imageID,
         }),
       );
@@ -95,6 +96,34 @@ class _CameraScreenState extends State<CameraScreen> {
         return true;
       } else {
         print('Failed to upload images');
+        return false;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _sentSignalTrainning(BuildContext context) async {
+    try {
+      final response = await http.post(
+        Uri.parse(AppConfig.http_url + "/trainning"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'status': true,
+        }),
+      );
+      if (response.statusCode == 200) {
+        print('Successful training');
+        showCustomToast(
+          context,
+          'Successful training, your face has been added to the recognition set.',
+        );
+        return true;
+      } else {
+        print('Failed to training');
         return false;
       }
     } catch (e) {
@@ -121,6 +150,39 @@ class _CameraScreenState extends State<CameraScreen> {
     super.dispose();
   }
 
+  void showCustomToast(BuildContext context, String message) {
+    final overlay = Overlay.of(context);
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16.0,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 20.0),
+            padding: EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Text(
+              message,
+              style: TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
   Future<void> _takePicture(BuildContext context) async {
     try {
       await _initializeControllerFuture;
@@ -142,8 +204,9 @@ class _CameraScreenState extends State<CameraScreen> {
           imageID = _generateTimestampID();
           _currentStep++;
         }
-        if (_currentStep >= _instructions.length) {
+        if (_currentStep == _instructions.length) {
           _timer?.cancel();
+          await _sentSignalTrainning(context);
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -154,10 +217,9 @@ class _CameraScreenState extends State<CameraScreen> {
           setState(() {});
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Face is not at the correct angle. Please try again.')),
+        showCustomToast(
+          context,
+          'Face is not at the correct angle. Please try again.',
         );
       }
     } catch (e) {

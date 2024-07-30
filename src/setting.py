@@ -20,8 +20,8 @@ ARCFACE_MODEL_URL = (
 )
 OC_SVM_FACE_MODEL_PATH = "models/oc_svm_face_model.pkl"
 FACEDATA = "faceData/face_data.pkl"
-SVM_FACE_MODEL_PATH = "models/svm_face_model.pkl"
+LR_FACE_MODEL_PATH = "models/svm_face_model.pkl"
 MAXIMUM_DISTANCE = 999
-FACE_VERIFY_THRESHOLD = 0.85
+FACE_VERIFY_THRESHOLD = 0.7
 MONGODB = "mongodb://localhost:27017/"
 PI_TO_DEG = 180

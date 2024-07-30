@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:labelapp/userNameScreen.dart';
 import 'cameraScreen.dart';
 import 'galleryScreen.dart';
 
@@ -41,18 +42,21 @@ class HomeScreen extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             ElevatedButton(
-              child: Text('Open Camera'),
+              child: Text('New Face Registration'),
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => CameraScreen(cameras: cameras),
-                  ),
+                      // builder: (context) => CameraScreen(
+                      //   cameras: cameras,
+                      //   userName: "re",
+                      // ),
+                      builder: (context) => UserNamePage(cameras: cameras)),
                 );
               },
             ),
             ElevatedButton(
-              child: Text('Open Gallery'),
+              child: Text('Face Recognition'),
               onPressed: () {
                 Navigator.push(
                   context,

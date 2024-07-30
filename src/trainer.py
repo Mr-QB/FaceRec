@@ -4,12 +4,17 @@ import cv2
 import pandas as pd
 import numpy as np
 from sklearn import svm
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+from sklearn.metrics import classification_report, accuracy_score
 import joblib
 from sklearn.preprocessing import LabelEncoder
 from src.faceDetect import FaceDetector
 from src.setting import *
 from .utility import checkAndDownloaFile
 import pickle
+from sklearn.ensemble import IsolationForest
 
 
 class Trainer:
@@ -29,11 +34,11 @@ class Trainer:
 
     def _loadData(self):
         try:
-            with open(FACEDATA, "rb") as f:
-                self.face_data = pickle.load(f)
-            # self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
-            # index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
-            # self.face_data = self.face_data.drop(index_to_drop)
+            # with open(FACEDATA, "rb") as f:
+            # self.face_data = pickle.load(f)
+            self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
+            index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
+            self.face_data = self.face_data.drop(index_to_drop)
         except (FileNotFoundError, KeyError):
             self.face_data = pd.DataFrame(columns=["label", "embedding", "imageID"])
 
@@ -58,14 +63,12 @@ class Trainer:
         else:
             return False
 
-    def _saveData(self, svm_model, label_encoder, oc_svm_model):
+    def _saveData(self, lr_model, label_encoder):
         with open(FACEDATA, "wb") as f:
             pickle.dump(self.face_data, f)
-        combined_model = {"model": svm_model, "label_encoder": label_encoder}
-        with open(SVM_FACE_MODEL_PATH, "wb") as f:
+        combined_model = {"model": lr_model, "label_encoder": label_encoder}
+        with open(LR_FACE_MODEL_PATH, "wb") as f:
             pickle.dump(combined_model, f)
-        with open(OC_SVM_FACE_MODEL_PATH, "wb") as f:
-            pickle.dump(oc_svm_model, f)
 
     def train(self):
         embeddings = (
@@ -80,13 +83,13 @@ class Trainer:
         X = np.array(embeddings)
         y = np.array(labels_encoded)
 
-        svm_model = svm.SVC(kernel="linear", probability=True)
-        svm_model.fit(X, y)
+        # svm_model = svm.SVC(kernel="linear", probability=True)
+        # svm_model.fit(X, y)
+        lr_model = make_pipeline(
+            StandardScaler(),
+            LogisticRegression(multi_class="multinomial", solver="lbfgs"),
+        )
+        lr_model.fit(X, y)
 
-        oc_svm_model = svm.OneClassSVM(kernel="linear", gamma="auto", nu=0.01)
-        oc_svm_model.fit(X)
-
-        self.combined_model = {"model": svm_model, "label_encoder": label_encoder}
-
-        self._saveData(svm_model, label_encoder, oc_svm_model)
+        self._saveData(lr_model, label_encoder)
         return True
