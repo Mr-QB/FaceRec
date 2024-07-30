@@ -29,9 +29,9 @@ class Trainer:
 
     def _loadData(self):
         try:
-            # with open(FACEDATA, "rb") as f:
-            #     self.face_data = pickle.load(f)
-            self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
+            with open(FACEDATA, "rb") as f:
+                self.face_data = pickle.load(f)
+            # self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
             # index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
             # self.face_data = self.face_data.drop(index_to_drop)
         except (FileNotFoundError, KeyError):
@@ -83,7 +83,7 @@ class Trainer:
         svm_model = svm.SVC(kernel="linear", probability=True)
         svm_model.fit(X, y)
 
-        oc_svm_model = svm.OneClassSVM(kernel="linear", nu=0.1)
+        oc_svm_model = svm.OneClassSVM(kernel="linear", gamma="auto", nu=0.01)
         oc_svm_model.fit(X)
 
         self.combined_model = {"model": svm_model, "label_encoder": label_encoder}
