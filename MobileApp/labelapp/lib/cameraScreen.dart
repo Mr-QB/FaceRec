@@ -11,7 +11,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'dart:typed_data';
-import 'galleryScreen.dart';
+import 'homeScreen.dart';
 import 'imageSetScreen.dart';
 import 'config.dart';
 
@@ -210,7 +210,7 @@ class _CameraScreenState extends State<CameraScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => GalleryScreen(),
+              builder: (context) => HomeScreen(cameras: widget.cameras),
             ),
           );
         } else {
@@ -313,19 +313,6 @@ class _CameraScreenState extends State<CameraScreen> {
             return Stack(
               children: [
                 CameraPreview(_controller),
-                // ...boundingBoxes.map((rect) {
-                //   return Positioned(
-                //     left: rect.left,
-                //     top: rect.top,
-                //     width: rect.width,
-                //     height: rect.height,
-                //     child: Container(
-                //       decoration: BoxDecoration(
-                //         border: Border.all(color: Colors.red, width: 2),
-                //       ),
-                //     ),
-                //   );
-                // }).toList(),
                 Positioned(
                   bottom: 20,
                   left: 0,
