@@ -118,11 +118,17 @@ class FlaskApp:
         def trainningSvmModel():
             data = request.json
             if data.get("status", False):
-                self.trainer.train()
-                return (
-                    jsonify({"status": "success", "message": "Successful training"}),
-                    200,
-                )
+                try:
+                    self.trainer.train()
+                    self.face_identifier._loadModel()
+                    return (
+                        jsonify(
+                            {"status": "success", "message": "Successful training"}
+                        ),
+                        200,
+                    )
+                except:
+                    return 201
 
         @self.app.route("/recogn", methods=["POST"])
         def recognFace():
