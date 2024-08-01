@@ -23,6 +23,6 @@ FACEDATA = "faceData/face_data.pkl"
 FACEDATA100 = "faceData/face_data_100.pkl"
 LR_FACE_MODEL_PATH = "models/lr_face_model.pkl"
 MAXIMUM_DISTANCE = 999
-FACE_VERIFY_THRESHOLD = 0.7
+FACE_VERIFY_THRESHOLD = 0.85
 MONGODB = "mongodb://localhost:27017/"
 PI_TO_DEG = 180

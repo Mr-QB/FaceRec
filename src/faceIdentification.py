@@ -40,7 +40,7 @@ class FaceIdentifier:
             image_embedding = self._embedImage(image)
 
             proba = self.lr_model.predict_proba(image_embedding)[0]
-            print(proba)
+            print(np.max(proba))
             if np.max(proba) < self.threshold:
                 return "Unknown"
             else:
