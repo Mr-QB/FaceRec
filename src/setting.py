@@ -20,6 +20,7 @@ ARCFACE_MODEL_URL = (
 )
 # OC_SVM_FACE_MODEL_PATH = "models/oc_svm_face_model.pkl"
 FACEDATA = "faceData/face_data.pkl"
+FACEDATA100 = "faceData/face_data_100.pkl"
 LR_FACE_MODEL_PATH = "models/lr_face_model.pkl"
 MAXIMUM_DISTANCE = 999
 FACE_VERIFY_THRESHOLD = 0.7

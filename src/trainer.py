@@ -34,11 +34,11 @@ class Trainer:
 
     def _loadData(self):
         try:
-            # with open(FACEDATA, "rb") as f:
-            # self.face_data = pickle.load(f)
-            self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
-            index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
-            self.face_data = self.face_data.drop(index_to_drop)
+            with open(FACEDATA100, "rb") as f:
+                self.face_data = pickle.load(f)
+            # self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
+            # index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
+            # self.face_data = self.face_data.drop(index_to_drop)
         except (FileNotFoundError, KeyError):
             self.face_data = pd.DataFrame(columns=["label", "embedding", "imageID"])
 
