@@ -49,7 +49,6 @@ class FlaskApp:
 
     def _faceRecogn(self, image):
         names = []
-        image = self._adjustImageOrientation(image)
         faces_cropped, x, y = self.face_detector.getFaceAligneded(image)
         for i in range(len(faces_cropped)):
             x_min, x_max = x[i]
@@ -136,8 +135,10 @@ class FlaskApp:
                     return jsonify({"error": "No image data provided"}), 400
 
                 image_data = base64.b64decode(base64_image)
-                image_np = np.frombuffer(image_data, np.uint8)
-                image_cv = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+                image = Image.open(BytesIO(image_data))
+                image = self._adjustImageOrientation(image)
+                image_np = np.array(image)
+                image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
                 cv2.imwrite("uploaded_image.jpg", image_cv)
 
                 names = self._faceRecogn(image_cv)
