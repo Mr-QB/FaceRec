@@ -27,7 +27,6 @@ class FlaskApp:
 
     def _adjustImageOrientation(self, image):
         try:
-            # Kiểm tra và điều chỉnh hướng của ảnh
             for orientation in ExifTags.TAGS.keys():
                 if ExifTags.TAGS[orientation] == "Orientation":
                     break
