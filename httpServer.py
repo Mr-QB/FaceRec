@@ -1,23 +1,67 @@
 import time
 from flask import Flask, request, jsonify
+from flask_socketio import SocketIO, emit
 import base64
+import random
+import base64
+from io import BytesIO
+from PIL import Image, ExifTags
 from threading import Timer
 import subprocess
 import numpy as np
 import cv2
+
 from src.trainer import Trainer
+from src.faceDetect import FaceDetector
+from src.faceIdentification import FaceIdentifier
 
 
 class FlaskApp:
     def __init__(self):
         self.app = Flask(__name__)
-        self.UPLOAD_FOLDER = "uploads"
+        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
         self._setupRoutes()
-        self.trainer = Trainer()
+        # self.trainer = Trainer()
         self.last_request_time = time.time()
         self.inactivity_timeout = 60
         self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
         self.inactivity_timer.start()
+        self.face_detector = FaceDetector()  # Create Face detector
+        self.face_identifier = FaceIdentifier()
+
+    def _adjustImageOrientation(self, image):
+        try:
+            # Kiểm tra và điều chỉnh hướng của ảnh
+            for orientation in ExifTags.TAGS.keys():
+                if ExifTags.TAGS[orientation] == "Orientation":
+                    break
+
+            if "exif" in image.info:
+                exif = image._getexif()
+                if exif is not None:
+                    orientation = exif.get(orientation)
+                    if orientation == 3:
+                        image = image.rotate(180, expand=True)
+                    elif orientation == 6:
+                        image = image.rotate(270, expand=True)
+                    elif orientation == 8:
+                        image = image.rotate(90, expand=True)
+        except Exception as e:
+            print(f"Error adjusting image orientation: {e}")
+
+        return image
+
+    def _faceRecogn(self, image):
+        names = []
+        image = self._adjustImageOrientation(image)
+        faces_cropped, x, y = self.face_detector.getFaceAligneded(image)
+        for i in range(len(faces_cropped)):
+            x_min, x_max = x[i]
+            y_min, y_max = y[i]
+
+            face_name = self.face_identifier.result_name(faces_cropped[i])
+            names.append(face_name)
+        return face_name
 
     def _startTunnel(self):
         command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
@@ -35,9 +79,9 @@ class FlaskApp:
         return image
 
     def _setupRoutes(self):
-        @self.app.route("/status", methods=["GET"])
-        def status():
-            return "Running..."
+        @self.app.route("/", methods=["GET"])
+        def home():
+            return "Welcome to the server!"
 
         @self.app.route("/pushimages", methods=["POST"])
         def pushtest():
@@ -85,6 +129,29 @@ class FlaskApp:
                     jsonify({"status": "success", "message": "Successful training"}),
                     200,
                 )
+
+        @self.app.route("/recogn", methods=["POST"])
+        def recognFace():
+            try:
+                data = request.get_json()
+                base64_image = data.get("image")
+
+                if not base64_image:
+                    return jsonify({"error": "No image data provided"}), 400
+
+                image_data = base64.b64decode(base64_image)
+
+                image = Image.open(BytesIO(image_data))
+
+                names = self._faceRecogn(image)
+                print(names)
+
+                return (
+                    jsonify({"message": "Image successfully uploaded", "names": names}),
+                    200,
+                )
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
 
     def clear(self):
         print("Clearing data due to inactivity...")
