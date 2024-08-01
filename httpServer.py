@@ -55,7 +55,7 @@ class FlaskApp:
 
             face_name = self.face_identifier.result_name(faces_cropped[i])
             names.append(face_name)
-        return face_name
+        return names
 
     def _startTunnel(self):
         command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
