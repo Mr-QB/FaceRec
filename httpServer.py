@@ -17,7 +17,7 @@ class FlaskApp:
     def __init__(self):
         self.app = Flask(__name__)
         self._setupRoutes()
-        # self.trainer = Trainer()
+        self.trainer = Trainer()
         self.last_request_time = time.time()
         self.inactivity_timeout = 60
         self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
