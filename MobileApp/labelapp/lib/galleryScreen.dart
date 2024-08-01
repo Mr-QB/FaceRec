@@ -40,27 +40,30 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     });
   }
 
-  Future<String> _convertCameraImageToBase64(CameraImage image) async {
-    return await compute(_convertCameraImageToBase64Isolate, image);
+  Future<String> convertCameraImageToBase64(CameraImage image) async {
+    final imglib.Image img = _convertCameraImageToImage(image);
+    final List<int> jpegBytes = imglib.encodeJpg(img);
+    return base64Encode(jpegBytes);
   }
 
-// Chuyển đổi CameraImage thành ảnh JPEG và mã hóa thành base64
-  Future<String> _convertCameraImageToBase64Isolate(CameraImage image) async {
+  // Chuyển đổi CameraImage thành đối tượng Image của imglib
+  imglib.Image _convertCameraImageToImage(CameraImage image) {
     final int width = image.width;
     final int height = image.height;
+    final imglib.Image img = imglib.Image(width, height);
 
-    // Tạo đối tượng ảnh từ gói image
-    imglib.Image img = imglib.Image(width, height);
+    final int uvRowStride = image.planes[1].bytesPerRow;
+    final int uvPixelStride = image.planes[1].bytesPerPixel!;
 
-    // Điền dữ liệu vào đối tượng ảnh
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
-        final int uvIndex = (x ~/ 2) + (y ~/ 2) * (width ~/ 2);
-        final int yValue = image.planes[0].bytes[y * width + x];
+        final int uvIndex = (x ~/ 2) * uvPixelStride + (y ~/ 2) * uvRowStride;
+        final int index = y * width + x;
+
+        final int yValue = image.planes[0].bytes[index];
         final int uValue = image.planes[1].bytes[uvIndex];
         final int vValue = image.planes[2].bytes[uvIndex];
 
-        // Tính toán màu pixel
         final int r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
         final int g =
             (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
@@ -72,16 +75,12 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
       }
     }
 
-    // Mã hóa ảnh thành JPEG và chuyển đổi thành byte
-    final List<int> jpegBytes = imglib.encodeJpg(img);
-    final String base64Image = base64Encode(jpegBytes);
-
-    return base64Image;
+    return img;
   }
 
   void _sendImageStreamToServer(CameraImage image) async {
     try {
-      final String base64Image = await _convertCameraImageToBase64(image);
+      final String base64Image = await convertCameraImageToBase64(image);
 
       final Uri uri = Uri.parse('http://192.168.1.234:5000/upload');
       final response = await http.post(
@@ -98,39 +97,6 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     } catch (e) {
       print('Error sending image to server: $e');
     }
-  }
-
-  Uint8List _convertCameraImageToBytes(CameraImage image) {
-    final int width = image.width;
-    final int height = image.height;
-    final Uint8List bytes = Uint8List(width * height * 3);
-
-    final int uvRowStride = image.planes[1].bytesPerRow;
-    final int uvPixelStride = image.planes[1].bytesPerRow ~/ (width ~/ 2);
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final int index = y * width + x;
-        final int yValue = image.planes[0].bytes[index];
-        final int uValue = image
-            .planes[1].bytes[(y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride];
-        final int vValue = image
-            .planes[2].bytes[(y ~/ 2) * uvRowStride + (x ~/ 2) * uvPixelStride];
-        final int r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
-        final int g =
-            (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
-                .clamp(0, 255)
-                .toInt();
-        final int b = (yValue + 1.772 * (uValue - 128)).clamp(0, 255).toInt();
-
-        // Assuming the bytes array is arranged as [R, G, B]
-        bytes[index * 3] = r; // R
-        bytes[index * 3 + 1] = g; // G
-        bytes[index * 3 + 2] = b; // B
-      }
-    }
-
-    return bytes;
   }
 
   @override
