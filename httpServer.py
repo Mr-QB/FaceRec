@@ -136,10 +136,11 @@ class FlaskApp:
                     return jsonify({"error": "No image data provided"}), 400
 
                 image_data = base64.b64decode(base64_image)
+                image_np = np.frombuffer(image_data, np.uint8)
+                image_cv = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+                cv2.imwrite("uploaded_image.jpg", image_cv)
 
-                image = Image.open(BytesIO(image_data))
-
-                names = self._faceRecogn(image)
+                names = self._faceRecogn(image_cv)
                 print(names)
 
                 return (
