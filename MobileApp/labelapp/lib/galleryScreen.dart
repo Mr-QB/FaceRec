@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:image/image.dart' as imglib;
-import 'package:flutter/foundation.dart';
 import 'package:camera/camera.dart';
-import 'package:http/http.dart' as http;
-import 'dart:typed_data';
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class RecognitionScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
+
   RecognitionScreen({required this.cameras});
 
   @override
@@ -18,17 +17,21 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   bool _isUsingFrontCamera = false;
+  late WebSocketChannel _channel;
 
   @override
   void initState() {
     super.initState();
     _initializeCameraController(widget.cameras[0]);
+    _channel = WebSocketChannel.connect(
+      Uri.parse('ws://192.168.1.234:8765'),
+    );
   }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.high,
+      ResolutionPreset.low, // Giảm độ phân giải
       enableAudio: false,
     );
     _initializeControllerFuture = _controller.initialize().then((_) {
@@ -40,29 +43,21 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     });
   }
 
-  Future<String> convertCameraImageToBase64(CameraImage image) async {
-    final imglib.Image img = _convertCameraImageToImage(image);
-    final List<int> jpegBytes = imglib.encodeJpg(img);
-    return base64Encode(jpegBytes);
-  }
-
-  // Chuyển đổi CameraImage thành đối tượng Image của imglib
-  imglib.Image _convertCameraImageToImage(CameraImage image) {
+  Uint8List _convertCameraImageToUint8List(CameraImage image) {
     final int width = image.width;
     final int height = image.height;
-    final imglib.Image img = imglib.Image(width, height);
-
-    final int uvRowStride = image.planes[1].bytesPerRow;
-    final int uvPixelStride = image.planes[1].bytesPerPixel!;
+    final List<int> imageBytes = List<int>.filled(width * height * 3, 0);
 
     for (int y = 0; y < height; y++) {
       for (int x = 0; x < width; x++) {
-        final int uvIndex = (x ~/ 2) * uvPixelStride + (y ~/ 2) * uvRowStride;
         final int index = y * width + x;
-
         final int yValue = image.planes[0].bytes[index];
-        final int uValue = image.planes[1].bytes[uvIndex];
-        final int vValue = image.planes[2].bytes[uvIndex];
+        final int uValue = image.planes[1].bytes[
+            (x ~/ 2) * image.planes[1].bytesPerPixel! +
+                (y ~/ 2) * image.planes[1].bytesPerRow];
+        final int vValue = image.planes[2].bytes[
+            (x ~/ 2) * image.planes[2].bytesPerPixel! +
+                (y ~/ 2) * image.planes[2].bytesPerRow];
 
         final int r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
         final int g =
@@ -71,37 +66,30 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
                 .toInt();
         final int b = (yValue + 1.772 * (uValue - 128)).clamp(0, 255).toInt();
 
-        img.setPixel(x, y, imglib.getColor(r, g, b));
+        final int pixelIndex = (y * width + x) * 3;
+        imageBytes[pixelIndex] = r;
+        imageBytes[pixelIndex + 1] = g;
+        imageBytes[pixelIndex + 2] = b;
       }
     }
 
-    return img;
+    return Uint8List.fromList(imageBytes);
   }
 
   void _sendImageStreamToServer(CameraImage image) async {
     try {
-      final String base64Image = await convertCameraImageToBase64(image);
-
-      final Uri uri = Uri.parse('http://192.168.1.234:5000/upload');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'image': base64Image}),
-      );
-
-      if (response.statusCode == 200) {
-        print('Image successfully uploaded');
-      } else {
-        print('Failed to upload image: ${response.statusCode}');
-      }
+      final Uint8List imageBytes = _convertCameraImageToUint8List(image);
+      _channel.sink.add(imageBytes);
+      print('Image successfully sent to WebSocket server');
     } catch (e) {
-      print('Error sending image to server: $e');
+      print('Error sending image to WebSocket server: $e');
     }
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _channel.sink.close(); // Đóng kết nối WebSocket
     super.dispose();
   }
 
