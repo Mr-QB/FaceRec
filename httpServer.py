@@ -1,8 +1,5 @@
 import time
 from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
-import base64
-import random
 import base64
 from io import BytesIO
 from PIL import Image, ExifTags
@@ -19,7 +16,6 @@ from src.faceIdentification import FaceIdentifier
 class FlaskApp:
     def __init__(self):
         self.app = Flask(__name__)
-        self.socketio = SocketIO(self.app, cors_allowed_origins="*")
         self._setupRoutes()
         # self.trainer = Trainer()
         self.last_request_time = time.time()
