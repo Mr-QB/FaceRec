@@ -159,7 +159,7 @@ class FlaskApp:
 
     def clear(self):
         print("Clearing data due to inactivity...")
-        self.trainer.clear()
+        # self.trainer.clear()
 
     def reset_inactivity_timer(self):
         if self.inactivity_timer.is_alive():
