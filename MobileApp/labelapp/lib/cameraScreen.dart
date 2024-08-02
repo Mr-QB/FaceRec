@@ -29,7 +29,7 @@ class _CameraScreenState extends State<CameraScreen> {
   late Future<void> _initializeControllerFuture;
   bool _isUsingFrontCamera = false;
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
-  List<File> _capturedImagesFiles = []; // Lưu các tệp ảnh
+  List<File> _capturedImagesFiles = [];
   int _currentStep = 0;
   late Directory _appDir;
   List<Rect> boundingBoxes = [];
@@ -38,10 +38,10 @@ class _CameraScreenState extends State<CameraScreen> {
 
   final List<String> _instructions = [
     'Look Straight',
-    // 'Turn Left',
-    // 'Turn Right',
-    // 'Look Up',
-    // 'Look Down'
+    'Turn Left',
+    'Turn Right',
+    'Look Up',
+    'Look Down'
   ];
 
   @override
@@ -267,9 +267,9 @@ class _CameraScreenState extends State<CameraScreen> {
       case 2: // Right
         return headEulerAngleY! < -20;
       case 3: // Up
-        return headEulerAngleX! > 10; // Tilt head up
+        return headEulerAngleX! > 10;
       case 4: // Down
-        return headEulerAngleX! < -10; // Tilt head down
+        return headEulerAngleX! < -10;
       default:
         return false;
     }

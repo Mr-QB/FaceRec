@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:image/image.dart' as imglib;
 import 'package:camera/camera.dart';
+import 'package:http/http.dart' as http;
+import 'config.dart';
 import 'dart:convert';
-import 'dart:typed_data';
-import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:async';
 
 class RecognitionScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
-
   RecognitionScreen({required this.cameras});
 
   @override
@@ -17,79 +18,144 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   bool _isUsingFrontCamera = false;
-  late WebSocketChannel _channel;
+  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
     _initializeCameraController(widget.cameras[0]);
-    _channel = WebSocketChannel.connect(
-      Uri.parse('ws://192.168.1.234:8765'),
-    );
   }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.low, // Giảm độ phân giải
+      ResolutionPreset.medium, // Set resolution
       enableAudio: false,
     );
     _initializeControllerFuture = _controller.initialize().then((_) {
-      _controller.startImageStream((CameraImage image) {
-        _sendImageStreamToServer(image);
+      _timer = Timer.periodic(Duration(seconds: 1), (_) async {
+        try {
+          final image = await _controller.takePicture();
+          final base64Image = await convertImageToBase64(image);
+          _sendImageStreamToServer(context, base64Image);
+        } catch (e) {
+          print('Error capturing image: $e');
+        }
       });
     }).catchError((error) {
       print('Error initializing camera: $error');
     });
   }
 
-  Uint8List _convertCameraImageToUint8List(CameraImage image) {
-    final int width = image.width;
-    final int height = image.height;
-    final List<int> imageBytes = List<int>.filled(width * height * 3, 0);
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final int index = y * width + x;
-        final int yValue = image.planes[0].bytes[index];
-        final int uValue = image.planes[1].bytes[
-            (x ~/ 2) * image.planes[1].bytesPerPixel! +
-                (y ~/ 2) * image.planes[1].bytesPerRow];
-        final int vValue = image.planes[2].bytes[
-            (x ~/ 2) * image.planes[2].bytesPerPixel! +
-                (y ~/ 2) * image.planes[2].bytesPerRow];
-
-        final int r = (yValue + 1.402 * (vValue - 128)).clamp(0, 255).toInt();
-        final int g =
-            (yValue - 0.344136 * (uValue - 128) - 0.714136 * (vValue - 128))
-                .clamp(0, 255)
-                .toInt();
-        final int b = (yValue + 1.772 * (uValue - 128)).clamp(0, 255).toInt();
-
-        final int pixelIndex = (y * width + x) * 3;
-        imageBytes[pixelIndex] = r;
-        imageBytes[pixelIndex + 1] = g;
-        imageBytes[pixelIndex + 2] = b;
-      }
-    }
-
-    return Uint8List.fromList(imageBytes);
+  Future<String> convertImageToBase64(XFile imageFile) async {
+    final bytes = await imageFile.readAsBytes();
+    return base64Encode(bytes);
   }
 
-  void _sendImageStreamToServer(CameraImage image) async {
+  void _sendImageStreamToServer(
+      BuildContext context, String base64Image) async {
     try {
-      final Uint8List imageBytes = _convertCameraImageToUint8List(image);
-      _channel.sink.add(imageBytes);
-      print('Image successfully sent to WebSocket server');
+      final response = await http.post(
+        Uri.parse(AppConfig.http_url + "/recogn"),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'image': base64Image}),
+      );
+
+      if (response.statusCode == 200) {
+        print('Image successfully uploaded');
+        final data = jsonDecode(response.body);
+        final List<dynamic> names = data['names'];
+
+        _showToastsForNames(context, List<String>.from(names));
+      } else {
+        print('Failed to upload image: ${response.statusCode}');
+      }
     } catch (e) {
-      print('Error sending image to WebSocket server: $e');
+      print('Error sending image to server: $e');
+    }
+  }
+
+  void showCustomToast(BuildContext context, String message) {
+    final OverlayState? overlay = Overlay.of(context);
+    if (overlay == null) return;
+
+    final overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: MediaQuery.of(context).padding.top + 16.0,
+        left: 0,
+        right: 0,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            margin: EdgeInsets.symmetric(horizontal: 20.0),
+            padding: EdgeInsets.all(16.0),
+            decoration: BoxDecoration(
+              color: Colors.black87,
+              borderRadius: BorderRadius.circular(8.0),
+            ),
+            child: Text(
+              message,
+              style: TextStyle(color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(overlayEntry);
+
+    Future.delayed(Duration(seconds: 3), () {
+      overlayEntry.remove();
+    });
+  }
+
+  void _showToastsForNames(BuildContext context, List<String> names) {
+    final List<OverlayEntry> toastEntries = [];
+    for (int i = 0; i < names.length; i++) {
+      final overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+          top: MediaQuery.of(context).padding.top +
+              16.0 +
+              i * 80.0, // Adjust offset
+          left: 0,
+          right: 0,
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              margin: EdgeInsets.symmetric(horizontal: 20.0),
+              padding: EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Text(
+                names[i],
+                style: TextStyle(color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ),
+      );
+
+      toastEntries.add(overlayEntry);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final overlay = Overlay.of(context);
+        if (overlay != null) {
+          overlay.insert(overlayEntry);
+          Future.delayed(Duration(milliseconds: 600), () {
+            overlayEntry.remove();
+          });
+        }
+      });
     }
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _channel.sink.close(); // Đóng kết nối WebSocket
+    _timer?.cancel();
     super.dispose();
   }
 
