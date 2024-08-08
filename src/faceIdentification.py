@@ -35,8 +35,8 @@ class FaceIdentifier:
 
     def result_name(self, image):
         name = None
-        if self.anti_spoofing.check(image) == 0:
-            # if True:
+        # if self.anti_spoofing.check(image) == 0:
+        if True:
             image_embedding = self._embedImage(image)
 
             proba = self.lr_model.predict_proba(image_embedding)[0]

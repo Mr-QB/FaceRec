@@ -22,6 +22,7 @@ class Trainer:
         checkAndDownloaFile(ARCFACE_MODEL_PATH, ARCFACE_MODEL_URL)
         self.face_rec = ArcFace.ArcFace(ARCFACE_MODEL_PATH)
         self.face_detector = FaceDetector()
+        # self.face_data_path = FACEDATA100
 
         self._loadData()
 
