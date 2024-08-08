@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'cameraScreen.dart';
+import 'registerScreen.dart';
 
 class UserNamePage extends StatefulWidget {
   final List<CameraDescription> cameras;

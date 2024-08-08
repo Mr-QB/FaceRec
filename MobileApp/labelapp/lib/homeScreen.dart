@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:labelapp/userNameScreen.dart';
-import 'cameraScreen.dart';
-import 'galleryScreen.dart';
+import 'recognitionScreen.dart';
 
 class HomeScreen extends StatelessWidget {
   final List<CameraDescription> cameras;
