@@ -6,11 +6,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:intl/intl.dart';
-// import 'dart:ui' as ui;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
 import 'homeScreen.dart';
 import 'imageSetScreen.dart';
 import 'config.dart';
@@ -38,16 +36,16 @@ class _CameraScreenState extends State<CameraScreen> {
 
   final List<String> _instructions = [
     'Look Straight',
-    'Turn Left',
-    'Turn Right',
-    'Look Up',
-    'Look Down',
-    'Tilt Head Left',
-    'Tilt Head Up Left',
-    'Tilt Head Down Left',
-    'Tilt Head Right',
-    'Tilt Head Up Right',
-    'Tilt Head Down Right'
+    // 'Turn Left',
+    // 'Turn Right',
+    // 'Look Up',
+    // 'Look Down',
+    // 'Tilt Head Left',
+    // 'Tilt Head Up Left',
+    // 'Tilt Head Down Left',
+    // 'Tilt Head Right',
+    // 'Tilt Head Up Right',
+    // 'Tilt Head Down Right',
   ];
 
   @override
@@ -145,10 +143,6 @@ class _CameraScreenState extends State<CameraScreen> {
     return timestampStr;
   }
 
-  Future<Uint8List> _readImageAsBytes(File file) async {
-    return await file.readAsBytes();
-  }
-
   @override
   void dispose() {
     _controller.dispose();
@@ -189,6 +183,17 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
+  Future<void> deleteAllCapturedImages(List<File> imageFiles) async {
+    for (final file in imageFiles) {
+      try {
+        await file.delete();
+        print("Deleted: ${file.path}");
+      } catch (e) {
+        print("Error deleting file: ${file.path}, Error: $e");
+      }
+    }
+  }
+
   Future<void> _takePicture(BuildContext context) async {
     try {
       await _initializeControllerFuture;
@@ -211,13 +216,15 @@ class _CameraScreenState extends State<CameraScreen> {
         }
         if (_currentStep == _instructions.length) {
           _timer?.cancel();
-          await _sentSignalTrainning(context);
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => HomeScreen(cameras: widget.cameras),
             ),
           );
+          await _sentSignalTrainning(context);
+          await deleteAllCapturedImages(_capturedImagesFiles);
+          _capturedImagesFiles.clear();
         } else {
           setState(() {});
         }
@@ -232,29 +239,17 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
-  Future<void> _saveImagesToFolder(List<String> images) async {
-    final folderName = DateTime.now().millisecondsSinceEpoch.toString();
-    final folder = Directory(path.join(_appDir.path, folderName));
-    await folder.create();
-
-    for (var imagePath in images) {
-      final fileName = path.basename(imagePath);
-      final newImagePath = path.join(folder.path, fileName);
-      final imageFile = File(imagePath);
-      await imageFile.copy(newImagePath);
-      await GallerySaver.saveImage(newImagePath);
-    }
-
-    // Save folder path globally
-    ImagePathManager().folders.add(folder.path);
-
-    _capturedImagesFiles.clear();
-    _currentStep = 0;
-  }
-
   Future<List<Face>> _detectFaces(XFile image) async {
+    final startTime = DateTime.now(); // start
+
     final inputImage = InputImage.fromFilePath(image.path);
     final List<Face> faces = await faceDetector.processImage(inputImage);
+
+    final endTime = DateTime.now(); // end
+    final duration = endTime.difference(startTime);
+
+    print("Time taken to detect faces: ${duration.inMilliseconds} ms");
+
     return faces;
   }
 

@@ -86,7 +86,6 @@ class FlaskApp:
             image_data = data.get("images", "")
             user_name = data.get("userName", "unknown")
             image_id = data.get("imageID", "unknown")
-            print(image_id)
 
             if not image_data:
                 return (
@@ -97,6 +96,7 @@ class FlaskApp:
             try:
                 img_bytes = base64.b64decode(image_data)
                 image = self._loadImageFromBytes(img_bytes)
+                cv2.imwrite("image1.png", image)
 
                 if not self.trainer.addNewData(user_name, image, image_id):
                     return (
@@ -106,7 +106,7 @@ class FlaskApp:
                                 "message": "Face cannot be detected in the image",
                             }
                         ),
-                        400,
+                        401,
                     )
 
                 return jsonify({"status": "success", "message": "Image received"}), 200
