@@ -43,6 +43,7 @@ class FaceDetector:
 
         resized_image = cv2.resize(image, (self.w_fa, self.h_fa))
         resized_image = resized_image.transpose(SHAPE_OF_TRANSPOSE)
+        cv2.imwrite("image2.png", image)
         # Change data layout from HWC to CHW
         input_data = np.expand_dims(resized_image, axis=0)
 
