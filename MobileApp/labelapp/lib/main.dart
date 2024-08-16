@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'homeScreen.dart';
+import 'testScreen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,12 +16,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Camera and Gallery App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: HomeScreen(cameras: cameras),
-      // home: HomeScreen2(),
-    );
+        title: 'Camera and Gallery App',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        home: CameraCircle(cameras: cameras)
+        // home: HomeScreen2(),
+        );
   }
 }

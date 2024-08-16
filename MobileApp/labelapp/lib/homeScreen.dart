@@ -23,10 +23,6 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      // builder: (context) => CameraScreen(
-                      //   cameras: cameras,
-                      //   userName: "re",
-                      // ),
                       builder: (context) => UserNamePage(cameras: cameras)),
                 );
               },

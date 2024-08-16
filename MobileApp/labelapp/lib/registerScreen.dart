@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:gallery_saver/gallery_saver.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'homeScreen.dart';
-import 'imageSetScreen.dart';
 import 'config.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -29,7 +25,6 @@ class _CameraScreenState extends State<CameraScreen> {
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
   List<File> _capturedImagesFiles = [];
   int _currentStep = 0;
-  late Directory _appDir;
   List<Rect> boundingBoxes = [];
   Timer? _timer;
   late String imageID;
@@ -52,7 +47,6 @@ class _CameraScreenState extends State<CameraScreen> {
   void initState() {
     super.initState();
     _initializeCameraController(widget.cameras[0]);
-    _initializeAppDir();
     _startTimer();
     imageID = _generateTimestampID();
   }
@@ -61,10 +55,6 @@ class _CameraScreenState extends State<CameraScreen> {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       _takePicture(context);
     });
-  }
-
-  void _initializeAppDir() async {
-    _appDir = await getApplicationDocumentsDirectory();
   }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
