@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image/image.dart' as imglib;
 import 'package:http/http.dart' as http;
 import 'config.dart';
@@ -21,13 +22,49 @@ class _CameraCircleState extends State<CameraCircle> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
-  int _currentSegment = 0;
   final int _totalSegments = 11;
+  final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
+  int _currentSegment = 0;
   List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   Timer? _timer;
   bool _isProcessing = false;
 
-  Future<imglib.Image> convertImageToPng(CameraImage image) async {
+  Uint8List _convertCameraImageToBytes(CameraImage image) {
+    // Cần thêm mã để chuyển đổi CameraImage thành Uint8List.
+    // Giả sử ảnh là YUV, cần chuyển đổi thành RGB trước khi mã hóa PNG.
+    // Điều này thường phức tạp hơn và cần thêm thư viện hoặc mã để thực hiện.
+    // Đây chỉ là một ví dụ đơn giản và có thể không hoạt động với tất cả các định dạng ảnh.
+
+    // Ví dụ giả lập
+    return Uint8List.fromList([]); // Thay đổi với mã chuyển đổi thực sự.
+  }
+
+  Future<List<Face>> _detectFaces(CameraImage image) async {
+    final startTime = DateTime.now();
+
+    final pngBytes = _convertCameraImageToBytes(image);
+
+    final inputImage = InputImage.fromBytes(
+      bytes: pngBytes,
+      metadata: InputImageMetadata(
+        size: Size(image.width.toDouble(), image.height.toDouble()),
+        rotation: InputImageRotation.rotation0deg,
+        format: InputImageFormat.bgra8888,
+        bytesPerRow: image.planes[0].bytesPerRow,
+      ),
+    );
+
+    final List<Face> faces = await faceDetector.processImage(inputImage);
+
+    final endTime = DateTime.now(); // end
+    final duration = endTime.difference(startTime); // Tính thời gian xử lý
+
+    print("Time taken to detect faces: ${duration.inMilliseconds} ms");
+
+    return faces; // Trả về danh sách các khuôn mặt phát hiện được
+  }
+
+  Future<Uint8List> convertImageToPng(CameraImage image) async {
     try {
       imglib.Image imgImage;
 
@@ -39,7 +76,8 @@ class _CameraCircleState extends State<CameraCircle> {
         throw Exception('Unsupported image format');
       }
 
-      return imgImage;
+      // Encode imgImage to PNG
+      return Uint8List.fromList(imglib.encodePng(imgImage));
     } catch (e) {
       print(">>>>>>>>>>>> ERROR: " + e.toString());
       return Future.error(e);
@@ -57,68 +95,43 @@ class _CameraCircleState extends State<CameraCircle> {
   }
 
   imglib.Image _convertYUV420(CameraImage image) {
-    // CameraImage YUV420 -> PNG
-    var img = imglib.Image(image.width, image.height); // Create Image buffer
+    final width = image.width;
+    final height = image.height;
+    final convertedImage = imglib.Image(width, height);
 
-    Plane plane = image.planes[0];
-    const int shift = (0xFF << 24);
+    final yPlane = image.planes[0];
 
-    // Fill image buffer with plane[0] from YUV420_888
-    for (int x = 0; x < image.width; x++) {
-      for (int planeOffset = 0;
-          planeOffset < image.height * image.width;
-          planeOffset += image.width) {
-        final pixelColor = plane.bytes[planeOffset + x];
-        // color: 0x FF  FF  FF  FF
-        //           A   B   G   R
-        // Calculate pixel color
-        var newVal =
-            shift | (pixelColor << 16) | (pixelColor << 8) | pixelColor;
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        final yIndex = y * yPlane.bytesPerRow + x;
 
-        img.data[planeOffset + x] = newVal;
+        if (yIndex < yPlane.bytes.length) {
+          // Ensure index is within bounds
+          final yValue = yPlane.bytes[yIndex];
+
+          // Set the pixel value as grayscale
+          convertedImage.setPixel(
+              x,
+              y,
+              imglib.getColor(
+                yValue,
+                yValue,
+                yValue,
+              ));
+        }
       }
     }
 
-    return img;
+    return convertedImage;
   }
 
-  Future<Uint8List> _getCameraImageBytes(CameraController controller) async {
+  Future<void> _sendImageToServer(Uint8List pngBytes) async {
     try {
-      final image = await controller.takePicture();
-      final bytes = await image.readAsBytes();
-      return Uint8List.fromList(bytes);
-    } catch (e) {
-      print('Error while taking photo: $e');
-      rethrow;
-    }
-  }
-
-  void _btnCallBack() async {
-    try {
-      await _initializeControllerFuture;
-
-      final imageUint8List = await _getCameraImageBytes(_controller);
-
-      final image = imglib.decodeImage(imageUint8List);
-
-      if (image == null) {
-        throw Exception('No se puede decodificar la imagen.');
-      }
-
-      await _sendImageToServer(image);
-    } catch (e) {
-      print('Error while taking photo: $e');
-    }
-  }
-
-  Future<void> _sendImageToServer(imglib.Image image) async {
-    try {
-      final pngBytes = imglib.encodePng(image);
-
       final url = Uri.parse(AppConfig.http_url + "/pushimages");
 
       final request = http.MultipartRequest('POST', url);
 
+      // Add the image as a file to the request
       request.files.add(http.MultipartFile.fromBytes('file', pngBytes,
           filename: 'image.png'));
 
@@ -147,7 +160,7 @@ class _CameraCircleState extends State<CameraCircle> {
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.low,
+      ResolutionPreset.medium,
     );
     _initializeControllerFuture = _controller.initialize();
     _initializeControllerFuture.then((_) {
