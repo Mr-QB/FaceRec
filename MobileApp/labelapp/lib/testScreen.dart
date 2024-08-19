@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:image/image.dart' as img;
+import 'package:image/image.dart' as imglib;
 import 'package:http/http.dart' as http;
 import 'config.dart';
 
@@ -27,9 +27,9 @@ class _CameraCircleState extends State<CameraCircle> {
   Timer? _timer;
   bool _isProcessing = false;
 
-  Future<img.Image> convertImageToPng(CameraImage image) async {
+  Future<imglib.Image> convertImageToPng(CameraImage image) async {
     try {
-      img.Image imgImage;
+      imglib.Image imgImage;
 
       if (image.format.group == ImageFormatGroup.yuv420) {
         imgImage = _convertYUV420(image);
@@ -46,73 +46,40 @@ class _CameraCircleState extends State<CameraCircle> {
     }
   }
 
-// CameraImage BGRA8888 -> PNG
-  img.Image _convertBGRA8888(CameraImage image) {
-    final width = image.width;
-    final height = image.height;
-    final convertedImage = img.Image(width, height);
-
-    final plane = image.planes[0];
-    final bytesPerRow = plane.bytesPerRow;
-
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final index = y * bytesPerRow + x * 4;
-        if (index + 3 < plane.bytes.length) {
-          // Ensure index is within bounds
-          final b = plane.bytes[index];
-          final g = plane.bytes[index + 1];
-          final r = plane.bytes[index + 2];
-          final a = plane.bytes[index + 3];
-
-          convertedImage.setPixel(x, y, img.getColor(r, g, b, a));
-        }
-      }
-    }
-
-    return convertedImage;
+  imglib.Image _convertBGRA8888(CameraImage image) {
+    // CameraImage BGRA8888 -> PNG
+    return imglib.Image.fromBytes(
+      image.width,
+      image.height,
+      image.planes[0].bytes,
+      format: imglib.Format.bgra,
+    );
   }
 
-// CameraImage YUV420 -> PNG
+  imglib.Image _convertYUV420(CameraImage image) {
+    // CameraImage YUV420 -> PNG
+    var img = imglib.Image(image.width, image.height); // Create Image buffer
 
-  img.Image _convertYUV420(CameraImage image) {
-    final width = image.width;
-    final height = image.height;
-    final convertedImage = img.Image(width, height);
+    Plane plane = image.planes[0];
+    const int shift = (0xFF << 24);
 
-    final yPlane = image.planes[0];
-    final uvPlane = image.planes[1];
+    // Fill image buffer with plane[0] from YUV420_888
+    for (int x = 0; x < image.width; x++) {
+      for (int planeOffset = 0;
+          planeOffset < image.height * image.width;
+          planeOffset += image.width) {
+        final pixelColor = plane.bytes[planeOffset + x];
+        // color: 0x FF  FF  FF  FF
+        //           A   B   G   R
+        // Calculate pixel color
+        var newVal =
+            shift | (pixelColor << 16) | (pixelColor << 8) | pixelColor;
 
-    for (int y = 0; y < height; y++) {
-      for (int x = 0; x < width; x++) {
-        final yIndex = y * yPlane.bytesPerRow + x;
-        final uvIndex = ((y ~/ 2) * (uvPlane.bytesPerRow ~/ 2) + (x ~/ 2)) * 2;
-
-        if (yIndex < yPlane.bytes.length &&
-            uvIndex + 1 < uvPlane.bytes.length) {
-          // Ensure index is within bounds
-          final yValue = yPlane.bytes[yIndex];
-          final uValue = uvPlane.bytes[uvIndex] - 128;
-          final vValue = uvPlane.bytes[uvIndex + 1] - 128;
-
-          final r = (yValue + (1.402 * vValue)).toInt();
-          final g =
-              (yValue - (0.344136 * uValue) - (0.714136 * vValue)).toInt();
-          final b = (yValue + (1.772 * uValue)).toInt();
-
-          convertedImage.setPixel(
-              x,
-              y,
-              img.getColor(
-                r.clamp(0, 255),
-                g.clamp(0, 255),
-                b.clamp(0, 255),
-              ));
-        }
+        img.data[planeOffset + x] = newVal;
       }
     }
 
-    return convertedImage;
+    return img;
   }
 
   Future<Uint8List> _getCameraImageBytes(CameraController controller) async {
@@ -132,7 +99,7 @@ class _CameraCircleState extends State<CameraCircle> {
 
       final imageUint8List = await _getCameraImageBytes(_controller);
 
-      final image = img.decodeImage(imageUint8List);
+      final image = imglib.decodeImage(imageUint8List);
 
       if (image == null) {
         throw Exception('No se puede decodificar la imagen.');
@@ -144,25 +111,30 @@ class _CameraCircleState extends State<CameraCircle> {
     }
   }
 
-  Future<void> _sendImageToServer(img.Image image) async {
-    final imageBytes = Uint8List.fromList(img.encodeJpg(image));
-    final url = Uri.parse(AppConfig.http_url + "/pushimages");
-
-    final request = http.MultipartRequest('POST', url);
-
-    request.files.add(http.MultipartFile.fromBytes('file', imageBytes,
-        filename: 'image.jpg'));
-
+  Future<void> _sendImageToServer(imglib.Image image) async {
     try {
-      final response = await request.send();
+      final pngBytes = imglib.encodePng(image);
 
-      if (response.statusCode == 200) {
-        print('Photo sent successfully');
-      } else {
-        print('Error while taking photo: ${response.statusCode}');
+      final url = Uri.parse(AppConfig.http_url + "/pushimages");
+
+      final request = http.MultipartRequest('POST', url);
+
+      request.files.add(http.MultipartFile.fromBytes('file', pngBytes,
+          filename: 'image.png'));
+
+      try {
+        final response = await request.send();
+
+        if (response.statusCode == 200) {
+          print('Photo sent successfully');
+        } else {
+          print('Error while sending photo: ${response.statusCode}');
+        }
+      } catch (e) {
+        print('Error while sending photo: $e');
       }
     } catch (e) {
-      print('Error while taking photo: $e');
+      print('Error encoding image: $e');
     }
   }
 
@@ -175,7 +147,7 @@ class _CameraCircleState extends State<CameraCircle> {
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.medium,
+      ResolutionPreset.low,
     );
     _initializeControllerFuture = _controller.initialize();
     _initializeControllerFuture.then((_) {
