@@ -29,41 +29,6 @@ class _CameraCircleState extends State<CameraCircle> {
   Timer? _timer;
   bool _isProcessing = false;
 
-  Uint8List _convertCameraImageToBytes(CameraImage image) {
-    // Cần thêm mã để chuyển đổi CameraImage thành Uint8List.
-    // Giả sử ảnh là YUV, cần chuyển đổi thành RGB trước khi mã hóa PNG.
-    // Điều này thường phức tạp hơn và cần thêm thư viện hoặc mã để thực hiện.
-    // Đây chỉ là một ví dụ đơn giản và có thể không hoạt động với tất cả các định dạng ảnh.
-
-    // Ví dụ giả lập
-    return Uint8List.fromList([]); // Thay đổi với mã chuyển đổi thực sự.
-  }
-
-  Future<List<Face>> _detectFaces(CameraImage image) async {
-    final startTime = DateTime.now();
-
-    final pngBytes = _convertCameraImageToBytes(image);
-
-    final inputImage = InputImage.fromBytes(
-      bytes: pngBytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: InputImageRotation.rotation0deg,
-        format: InputImageFormat.bgra8888,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      ),
-    );
-
-    final List<Face> faces = await faceDetector.processImage(inputImage);
-
-    final endTime = DateTime.now(); // end
-    final duration = endTime.difference(startTime); // Tính thời gian xử lý
-
-    print("Time taken to detect faces: ${duration.inMilliseconds} ms");
-
-    return faces; // Trả về danh sách các khuôn mặt phát hiện được
-  }
-
   Future<Uint8List> convertImageToPng(CameraImage image) async {
     try {
       imglib.Image imgImage;
