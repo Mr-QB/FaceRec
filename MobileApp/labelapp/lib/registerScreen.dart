@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'homeScreen.dart';
+import 'package:http_parser/http_parser.dart';
 import 'config.dart';
 
 class CameraScreen extends StatefulWidget {
@@ -27,32 +28,34 @@ class _CameraScreenState extends State<CameraScreen> {
   int _currentStep = 0;
   List<Rect> boundingBoxes = [];
   Timer? _timer;
+  final int _totalSegments = 11;
+  List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   late String imageID;
-
-  final List<String> _instructions = [
-    'Look Straight',
-    // 'Turn Left',
-    // 'Turn Right',
-    // 'Look Up',
-    // 'Look Down',
-    // 'Tilt Head Left',
-    // 'Tilt Head Up Left',
-    // 'Tilt Head Down Left',
-    // 'Tilt Head Right',
-    // 'Tilt Head Up Right',
-    // 'Tilt Head Down Right',
-  ];
+  int _currentSegment = 0;
+  Map<String, File?> imageConditions = {
+    'Straight': null,
+    'Left': null,
+    'Right': null,
+    'Up': null,
+    'Down': null,
+    'Tilt Head Left': null,
+    'Tilt Head Up Left': null,
+    'Tilt Head Down Left': null,
+    'Tilt Head Right': null,
+    'Tilt Head Up Right': null,
+    'Tilt Head Down Right': null,
+  };
 
   @override
   void initState() {
     super.initState();
-    _initializeCameraController(widget.cameras[0]);
+    _initializeCameraController(widget.cameras[1]);
     _startTimer();
     imageID = _generateTimestampID();
   }
 
   void _startTimer() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
+    _timer = Timer.periodic(Duration(milliseconds: 200), (timer) {
       _takePicture(context);
     });
   }
@@ -70,31 +73,63 @@ class _CameraScreenState extends State<CameraScreen> {
     return base64Encode(imageBytes);
   }
 
-  Future<bool> _sendImagesToServer(File imageFile, String imageID) async {
-    try {
-      final base64Image = await _convertImageToBase64(imageFile);
+  // Future<bool> _sendImagesToServer(File imageFile, String imageID) async {
+  //   try {
+  //     final base64Image = await _convertImageToBase64(imageFile);
 
-      final response = await http.post(
-        Uri.parse(AppConfig.http_url + "/pushimages"),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'images': base64Image,
-          'userName': widget.userName,
-          'imageID': imageID,
-        }),
-      );
+  //     final response = await http.post(
+  //       Uri.parse(AppConfig.http_url + "/pushimages"),
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //       },
+  //       body: jsonEncode({
+  //         'images': base64Image,
+  //         'userName': widget.userName,
+  //         'imageID': imageID,
+  //       }),
+  //     );
+  //     if (response.statusCode == 200) {
+  //       print('Images uploaded successfully');
+  //       return true;
+  //     } else {
+  //       print('Failed to upload images');
+  //       return false;
+  //     }
+  //   } catch (e) {
+  //     print('Error: $e');
+  //     return false;
+  //   }
+  // }
+  Future<void> sendImagesToServer(Map<String, File?> imageConditions) async {
+    final uri = Uri.parse(AppConfig.http_url + "/pushimages");
+
+    var request = http.MultipartRequest('POST', uri);
+
+    // Add each image file to the request
+    imageConditions.forEach((key, file) async {
+      if (file != null) {
+        request.files.add(
+          http.MultipartFile(
+            key, // Field name for the file
+            file.readAsBytes().asStream(),
+            file.lengthSync(),
+            filename: file.path.split('/').last,
+            contentType: MediaType('image', 'jpeg'), // Adjust if needed
+          ),
+        );
+      }
+    });
+
+    try {
+      final response = await request.send();
+
       if (response.statusCode == 200) {
         print('Images uploaded successfully');
-        return true;
       } else {
-        print('Failed to upload images');
-        return false;
+        print('Failed to upload images. Status code: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error: $e');
-      return false;
+      print('Error occurred while uploading images: $e');
     }
   }
 
@@ -196,33 +231,14 @@ class _CameraScreenState extends State<CameraScreen> {
       _capturedImagesFiles.add(imageFile);
 
       final faces = await _detectFaces(image);
-      final faceDetected = await _checkFaceAngle(faces);
-      print("Face detected: $faceDetected");
+      await _checkFaceAngle(faces, imageFile);
 
-      if (faceDetected) {
-        if (await _sendImagesToServer(imageFile, imageID)) {
-          imageID = _generateTimestampID();
-          _currentStep++;
-        }
-        if (_currentStep == _instructions.length) {
-          _timer?.cancel();
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HomeScreen(cameras: widget.cameras),
-            ),
-          );
-          await _sentSignalTrainning(context);
-          await deleteAllCapturedImages(_capturedImagesFiles);
-          _capturedImagesFiles.clear();
-        } else {
-          setState(() {});
-        }
+      bool hasNonNullValues =
+          imageConditions.values.any((file) => file != null);
+      if (hasNonNullValues) {
+        await sendImagesToServer(imageConditions);
       } else {
-        showCustomToast(
-          context,
-          'Face is not at the correct angle. Please try again.',
-        );
+        print('No valid images to upload.');
       }
     } catch (e) {
       print(e);
@@ -243,7 +259,7 @@ class _CameraScreenState extends State<CameraScreen> {
     return faces;
   }
 
-  bool _checkFaceAngle(List<Face> faces) {
+  Map<String, dynamic> _checkFaceAngle(List<Face> faces, File imageFile) {
     final face = faces.first;
     final headEulerAngleY = face.headEulerAngleY;
     final headEulerAngleZ = face.headEulerAngleZ;
@@ -253,81 +269,121 @@ class _CameraScreenState extends State<CameraScreen> {
     print('headEulerAngleZ: $headEulerAngleZ');
     print('headEulerAngleX: $headEulerAngleX');
 
-    switch (_currentStep) {
-      case 0: // Straight
-        return headEulerAngleY!.abs() < 10 && headEulerAngleZ!.abs() < 10;
-      case 1: // Left
-        return headEulerAngleY! > 20;
-      case 2: // Right
-        return headEulerAngleY! < -20;
-      case 3: // Up
-        return headEulerAngleX! > 10;
-      case 4: // Down
-        return headEulerAngleX! < -10;
-      case 5: // Tilt Head Left
-        return headEulerAngleZ! < -10;
-      case 6: // Tilt Head Up Left
-        return headEulerAngleX! > 10 && headEulerAngleZ! < -10;
-      case 7: // Tilt Head Down Left
-        return headEulerAngleX! < -10 && headEulerAngleZ! < -10;
-      case 8: // Tilt Head Right
-        return headEulerAngleZ! > 10;
-      case 9: // Tilt Head Up Right
-        return headEulerAngleX! > 10 && headEulerAngleZ! > 10;
-      case 10: // Tilt Head Down Right
-        return headEulerAngleX! < -10 && headEulerAngleZ! > -10;
-      default:
-        return false;
+    if (headEulerAngleY != null &&
+        headEulerAngleZ != null &&
+        headEulerAngleX != null) {
+      if (headEulerAngleY.abs() < 10 &&
+          headEulerAngleZ.abs() < 10 &&
+          imageConditions['Straight'] == null) {
+        imageConditions['Straight'] = imageFile;
+      }
+      if (headEulerAngleY > 20 && imageConditions['Left'] == null) {
+        imageConditions['Left'] = imageFile;
+      }
+      if (headEulerAngleY < -20 && imageConditions['Right'] == null) {
+        imageConditions['Right'] = imageFile;
+      }
+      if (headEulerAngleX > 10 && imageConditions['Up'] == null) {
+        imageConditions['Up'] = imageFile;
+      }
+      if (headEulerAngleX < -15 && imageConditions['Down'] == null) {
+        imageConditions['Down'] = imageFile;
+      }
+      if (headEulerAngleZ < -15 &&
+          headEulerAngleY.abs() < 10 &&
+          headEulerAngleZ.abs() < 10 &&
+          imageConditions['Tilt Head Left'] == null) {
+        imageConditions['Tilt Head Left'] = imageFile;
+      }
+      if (headEulerAngleX > 15 &&
+          headEulerAngleY > 20 &&
+          imageConditions['Tilt Head Up Left'] == null) {
+        imageConditions['Tilt Head Up Left'] = imageFile;
+      }
+      if (headEulerAngleX < -15 &&
+          headEulerAngleY > 20 &&
+          imageConditions['Tilt Head Down Left'] == null) {
+        imageConditions['Tilt Head Down Left'] = imageFile;
+      }
+      if (headEulerAngleZ > 15 &&
+          headEulerAngleY.abs() < 10 &&
+          headEulerAngleZ.abs() < 10 &&
+          imageConditions['Tilt Head Right'] == null) {
+        imageConditions['Tilt Head Right'] = imageFile;
+      }
+      if (headEulerAngleX > 10 &&
+          headEulerAngleY < -20 &&
+          imageConditions['Tilt Head Up Right'] == null) {
+        imageConditions['Tilt Head Up Right'] = imageFile;
+      }
+      if (headEulerAngleX < -15 &&
+          headEulerAngleY < -20 &&
+          imageConditions['Tilt Head Down Right'] == null) {
+        imageConditions['Tilt Head Down Right'] = imageFile;
+      }
+    } else {
+      print('Head Euler angles are null');
     }
-  }
-
-  void _switchCamera() {
-    final cameraDescription =
-        _isUsingFrontCamera ? widget.cameras[0] : widget.cameras[1];
     setState(() {
-      _isUsingFrontCamera = !_isUsingFrontCamera;
-      _initializeCameraController(cameraDescription);
+      int progress =
+          imageConditions.values.where((value) => value != null).length;
+      for (int i = 0; i < progress && i < _segmentColors.length; i++) {
+        _segmentColors[i] = Colors.green;
+      }
     });
+    // Check
+    final nullValues =
+        imageConditions.entries.where((entry) => entry.value == null);
+
+    for (var entry in nullValues) {
+      print('pose null value: ${entry.key}');
+    }
+
+    return imageConditions;
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenSize = MediaQuery.of(context).size;
+    final circleDiameter = screenSize.width < screenSize.height
+        ? screenSize.width * 0.9
+        : screenSize.height * 0.9;
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Camera'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.switch_camera),
-            onPressed: _switchCamera,
-          ),
-        ],
-      ),
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            return Stack(
-              children: [
-                CameraPreview(_controller),
-                Positioned(
-                  bottom: 20,
-                  left: 0,
-                  right: 0,
-                  child: Column(
-                    children: [
-                      Text(
-                        _instructions[_currentStep],
-                        style: TextStyle(color: Colors.white, fontSize: 24),
-                      ),
-                      SizedBox(height: 10),
-                      FloatingActionButton(
-                        child: Icon(Icons.camera),
-                        onPressed: () => _takePicture(context),
-                      ),
-                    ],
+            return Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  CustomPaint(
+                    size: Size(circleDiameter + 8.0, circleDiameter + 8.0),
+                    painter: BorderPainter(
+                      colors: _segmentColors,
+                      segments: _totalSegments,
+                    ),
                   ),
-                ),
-              ],
+                  ClipOval(
+                    child: SizedBox(
+                      width: circleDiameter,
+                      height: circleDiameter,
+                      child: AspectRatio(
+                        aspectRatio: _controller.value.aspectRatio,
+                        child: Transform.scale(
+                          scale: _controller.value.aspectRatio /
+                              MediaQuery.of(context).size.aspectRatio *
+                              0.5,
+                          child: Center(
+                            child: CameraPreview(_controller),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           } else {
             return Center(child: CircularProgressIndicator());
@@ -336,4 +392,39 @@ class _CameraScreenState extends State<CameraScreen> {
       ),
     );
   }
+}
+
+class BorderPainter extends CustomPainter {
+  final List<Color> colors;
+  final int segments;
+
+  BorderPainter({required this.colors, required this.segments});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0;
+
+    final radius = size.width / 2;
+    final center = Offset(radius, radius);
+
+    final segmentAngle = 2 * 3.14 / segments;
+    final startAngle = -3.14 / 2;
+
+    for (int i = 0; i < segments; i++) {
+      paint.color = colors[i];
+      final currentStartAngle = startAngle + i * segmentAngle;
+      final sweepAngle = segmentAngle;
+
+      final path = Path()
+        ..arcTo(Rect.fromCircle(center: center, radius: radius),
+            currentStartAngle, sweepAngle, false);
+
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) => true;
 }

@@ -16,12 +16,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-        title: 'Camera and Gallery App',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-        ),
-        home: CameraCircle(cameras: cameras)
-        // home: HomeScreen2(),
-        );
+      title: 'Camera and Gallery App',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      // home: CameraCircle(cameras: cameras)
+      home: HomeScreen(cameras: cameras),
+    );
   }
 }

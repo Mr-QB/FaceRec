@@ -22,9 +22,9 @@ class _CameraCircleState extends State<CameraCircle> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
-  final int _totalSegments = 11;
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
   int _currentSegment = 0;
+  final int _totalSegments = 11;
   List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   Timer? _timer;
   bool _isProcessing = false;
