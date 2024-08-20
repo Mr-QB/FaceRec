@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:labelapp/userNameScreen.dart';
+import 'registerScreen.dart';
 import 'recognitionScreen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -23,7 +24,11 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      builder: (context) => UserNamePage(cameras: cameras)),
+                      // builder: (context) => UserNamePage(cameras: cameras)),
+                      builder: (context) => CameraScreen(
+                            cameras: cameras,
+                            userName: "quocbao",
+                          )),
                 );
               },
             ),
