@@ -75,41 +75,6 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
     }
   }
 
-  void showCustomToast(BuildContext context, String message) {
-    final OverlayState? overlay = Overlay.of(context);
-    if (overlay == null) return;
-
-    final overlayEntry = OverlayEntry(
-      builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 16.0,
-        left: 0,
-        right: 0,
-        child: Material(
-          color: Colors.transparent,
-          child: Container(
-            margin: EdgeInsets.symmetric(horizontal: 20.0),
-            padding: EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(8.0),
-            ),
-            child: Text(
-              message,
-              style: TextStyle(color: Colors.white),
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    overlay.insert(overlayEntry);
-
-    Future.delayed(Duration(seconds: 3), () {
-      overlayEntry.remove();
-    });
-  }
-
   void _showToastsForNames(BuildContext context, List<String> names) {
     final List<OverlayEntry> toastEntries = [];
     for (int i = 0; i < names.length; i++) {

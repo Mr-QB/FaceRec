@@ -23,11 +23,9 @@ class _CameraCircleState extends State<CameraCircle> {
   late Future<void> _initializeControllerFuture;
 
   final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
-  int _currentSegment = 0;
   final int _totalSegments = 11;
   List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   Timer? _timer;
-  bool _isProcessing = false;
 
   Future<Uint8List> convertImageToPng(CameraImage image) async {
     try {
@@ -35,9 +33,11 @@ class _CameraCircleState extends State<CameraCircle> {
 
       if (image.format.group == ImageFormatGroup.yuv420) {
         imgImage = _convertYUV420(image);
-      } else if (image.format.group == ImageFormatGroup.bgra8888) {
-        imgImage = _convertBGRA8888(image);
-      } else {
+      }
+      // else if (image.format.group == ImageFormatGroup.bgra8888) {
+      //   imgImage = _convertBGRA8888(image);
+      // }
+      else {
         throw Exception('Unsupported image format');
       }
 
@@ -49,15 +49,15 @@ class _CameraCircleState extends State<CameraCircle> {
     }
   }
 
-  imglib.Image _convertBGRA8888(CameraImage image) {
-    // CameraImage BGRA8888 -> PNG
-    return imglib.Image.fromBytes(
-      image.width,
-      image.height,
-      image.planes[0].bytes,
-      format: imglib.Format.bgra,
-    );
-  }
+  // imglib.Image _convertBGRA8888(CameraImage image) {
+  //   // CameraImage BGRA8888 -> PNG
+  //   return imglib.Image.fromBytes(
+  //     image.width,
+  //     image.height,
+  //     image.planes[0].bytes,
+  //     format: imglib.Format.bgra,
+  //   );
+  // }
 
   imglib.Image _convertYUV420(CameraImage image) {
     final width = image.width;
@@ -94,11 +94,13 @@ class _CameraCircleState extends State<CameraCircle> {
     try {
       final url = Uri.parse(AppConfig.http_url + "/pushimages");
 
-      final request = http.MultipartRequest('POST', url);
+      final request = http.Request('POST', url);
 
-      // Add the image as a file to the request
-      request.files.add(http.MultipartFile.fromBytes('file', pngBytes,
-          filename: 'image.png'));
+      // Thêm dữ liệu byte vào body của request
+      request.bodyBytes = pngBytes;
+
+      // Đặt header để server biết loại dữ liệu
+      request.headers['Content-Type'] = 'application/octet-stream';
 
       try {
         final response = await request.send();
@@ -165,6 +167,7 @@ class _CameraCircleState extends State<CameraCircle> {
         : screenSize.height * 0.9;
 
     return Scaffold(
+      backgroundColor: Colors.black,
       body: FutureBuilder<void>(
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
