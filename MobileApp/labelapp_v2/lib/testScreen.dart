@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'dart:io';
+import 'dart:typed_data';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
@@ -22,7 +24,7 @@ class _CameraCircleState extends State<CameraCircle> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
 
-  final FaceDetector faceDetector = GoogleMlKit.vision.faceDetector();
+  final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector();
   final int _totalSegments = 11;
   List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   Timer? _timer;
@@ -62,7 +64,6 @@ class _CameraCircleState extends State<CameraCircle> {
 
       if (image.format.group == ImageFormatGroup.yuv420) {
         imgImage = _convertYUV420(image);
-
         imageBytes = imgImage.getBytes();
       } else if (image.format.group == ImageFormatGroup.bgra8888) {
         imgImage = _convertBGRA8888(image);
@@ -70,7 +71,7 @@ class _CameraCircleState extends State<CameraCircle> {
       } else {
         throw Exception('Unsupported image format');
       }
-      imageBytes = convertImageToGrayscaleBytes(imgImage);
+      // imageBytes = convertImageToGrayscaleBytes(imgImage);
       print('Image size: ${imageBytes.length} bytes');
       // imglib.encodeJpg(imgImage, quality: 80);
 
@@ -81,8 +82,8 @@ class _CameraCircleState extends State<CameraCircle> {
       final end_time = DateTime.now();
       final elapsed_time = end_time.difference(start_time).inMilliseconds;
       print('function _convertImageToPng pocessing__: $elapsed_time ms');
-      return imgImage_;
-      // return imageBytes;
+      // return imgImage_;
+      return imageBytes;
     } catch (e) {
       print(">>>>>>>>>>>> ERROR: " + e.toString());
       return Future.error(e);
@@ -167,7 +168,7 @@ class _CameraCircleState extends State<CameraCircle> {
   void _initializeCameraController(CameraDescription cameraDescription) {
     _controller = CameraController(
       cameraDescription,
-      ResolutionPreset.high,
+      ResolutionPreset.low,
     );
     _initializeControllerFuture = _controller.initialize();
     _initializeControllerFuture.then((_) {
@@ -179,16 +180,84 @@ class _CameraCircleState extends State<CameraCircle> {
     });
   }
 
+  InputImageMetadata createMetadata({
+    required Size size,
+    required InputImageRotation rotation,
+    required InputImageFormat format,
+    required int bytesPerRow,
+  }) {
+    return InputImageMetadata(
+      size: size,
+      rotation: rotation,
+      format: format,
+      bytesPerRow: bytesPerRow,
+    );
+  }
+
   void _processImageStream(CameraImage image) async {
     try {
-      final pngBytes = await _convertImageToPng(image);
-      if (pngBytes != null) {
-        await _sendImageToServer(pngBytes);
+      final start_time = DateTime.now();
+
+      // rotatedImage = imglib.copyRotate(image, 270);
+
+      int totalLength =
+          image.planes.fold(0, (sum, plane) => sum + plane.bytes.length);
+
+      Uint8List imageByte = Uint8List(totalLength);
+      int offset = 0;
+      for (final plane in image.planes) {
+        imageByte.setRange(offset, offset + plane.bytes.length, plane.bytes);
+        offset += plane.bytes.length;
+      }
+
+      final endTime = DateTime.now(); // end
+      final duration = endTime.difference(start_time);
+      print("Time to convert image: ${duration.inMilliseconds} ms");
+      // Uint8List imgImage_ =
+      //     Uint8List.fromList(imglib.encodeJpg(imageByte, quality: 80));
+      // _sendImageToServer(imgImage_);
+      if (imageByte != null) {
+        // await _sendImageToServer(pngBytes);
+        _detectFaces(imageByte);
       } else {
         print("Error converting image to PNG");
       }
     } catch (e) {
       print("Error processing image stream: " + e.toString());
+    }
+  }
+
+  Future<List<Face>> _detectFaces(Uint8List image) async {
+    print("rotation: ${_controller.description.sensorOrientation}");
+    // Uint8List bgraData = yuv420ToBgra8888(image, 1280, 720);
+    // Uint8List rotatedImageBytes = rotateBgra8888Degree270(bgraData, 1280, 720);
+    // Uint8List rotatedImageBytes = rotateYUV420Degree270(image, 1280, 720);
+    try {
+      final metadata = createMetadata(
+        size: Size(320, 240),
+        rotation: InputImageRotation.rotation270deg,
+        format: InputImageFormat.yuv420,
+        bytesPerRow: 0,
+      );
+
+      // final inputImage = InputImage.fromFilePath(image.path);
+      final inputImage = InputImage.fromBytes(bytes: image, metadata: metadata);
+      final startTime = DateTime.now(); // start
+      final List<Face> faces = await _faceDetector.processImage(inputImage);
+      if (faces.isEmpty) {
+        print("not face");
+      } else {
+        print("have face");
+      }
+
+      final endTime = DateTime.now(); // end
+      final duration = endTime.difference(startTime);
+      print("Time taken to detect faces: ${duration.inMilliseconds} ms");
+
+      return faces;
+    } catch (e) {
+      print("Error processing image detectface: " + e.toString());
+      return [];
     }
   }
 
