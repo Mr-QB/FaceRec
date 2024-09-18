@@ -1,1 +1,6 @@
-{}
+{
+    "cmake.configureOnOpen": true,
+    "git.ignoreLimitWarning": true,
+    "dart.flutterSdkPath": "~/SDK/flutter",
+    "cmake.sourceDirectory": "/home/cai/Dev/FaceRec/MobileApp/labelapp/linux"
+}

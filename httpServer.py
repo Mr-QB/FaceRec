@@ -8,9 +8,12 @@ import subprocess
 import numpy as np
 import cv2
 
-from src.trainer import Trainer
-from src.faceDetect import FaceDetector
-from src.faceIdentification import FaceIdentifier
+from ai_core.trainer import Trainer
+from ai_core.faceDetect import FaceDetector
+from ai_core.faceIdentification import FaceIdentifier
+from ai_core.database import HrmDatabase
+
+# from ai_core.utility import checkImage
 
 
 class FlaskApp:
@@ -18,12 +21,12 @@ class FlaskApp:
         self.app = Flask(__name__)
         self._setupRoutes()
         self.trainer = Trainer()
-        self.last_request_time = time.time()
-        self.inactivity_timeout = 60
-        self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
-        self.inactivity_timer.start()
         self.face_detector = FaceDetector()  # Create Face detector
         self.face_identifier = FaceIdentifier()
+        self.database = HrmDatabase()
+
+    def trainning(self):
+        self.trainer.train()
 
     def _adjustImageOrientation(self, image):
         try:
@@ -57,11 +60,6 @@ class FlaskApp:
             names.append(face_name)
         return names
 
-    def _startTunnel(self):
-        command = "autossh -M 0 -o ServerAliveInterval=60 -i ssh_key -R httptest.onlyfan.vn:80:localhost:5000 serveo.net"
-        # command = "autossh -M 0 -o ServerAliveInterval=60  -N -R  5001:localhost:5001 ubuntu@54.252.209.12 -i ec2_key.pem"
-        subprocess.Popen(command, shell=True)
-
     def _loadImageFromBytes(self, image_bytes):
         np_array = np.frombuffer(image_bytes, np.uint8)
         image = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
@@ -77,15 +75,15 @@ class FlaskApp:
         def home():
             return "Welcome to the server!"
 
-        @self.app.route("/pushimages", methods=["POST"])
-        def pushtest():
+        @self.app.route("/user", methods=["POST"])
+        def addUser():
             self.last_request_time = time.time()
             self.reset_inactivity_timer()
 
             data = request.json
             image_data = data.get("images", "")
             user_name = data.get("userName", "unknown")
-            image_id = data.get("imageID", "unknown")
+            user_id = data.get("userID", "unknown")
 
             if not image_data:
                 return (
@@ -98,37 +96,68 @@ class FlaskApp:
                 image = self._loadImageFromBytes(img_bytes)
                 cv2.imwrite("image1.png", image)
 
-                if not self.trainer.addNewData(user_name, image, image_id):
-                    return (
-                        jsonify(
-                            {
-                                "status": "false",
-                                "message": "Face cannot be detected in the image",
-                            }
-                        ),
-                        401,
-                    )
+                data_batch = {
+                    "fullName": user_name,
+                    "userID": user_id,
+                    "email": "david@example.com",
+                    "Images": image_data,
+                    "incomplete": True,
+                }
+
+                self.database.addNew(data_batch=data_batch)
 
                 return jsonify({"status": "success", "message": "Image received"}), 200
             except Exception as e:
                 print(f"Error: {e}")
                 return jsonify({"status": "false", "message": str(e)}), 500
 
-        @self.app.route("/trainning", methods=["POST"])
-        def trainningSvmModel():
+        @self.app.route("/user/:id", methods=["POST"])
+        def changeUserData():
+
             data = request.json
-            if data.get("status", False):
-                try:
-                    self.trainer.train()
-                    self.face_identifier._loadModel()
-                    return (
-                        jsonify(
-                            {"status": "success", "message": "Successful training"}
-                        ),
-                        200,
-                    )
-                except:
-                    return 201
+            image_data = data.get("images", "")
+            user_id = data.get("userID", "unknown")
+            user_name = data.get("userName", "unknown")
+            change_type = data.get("type", "unknown")
+
+            if not image_data:
+                return (
+                    jsonify({"status": "false", "message": "No image data provided"}),
+                    400,
+                )
+
+            try:
+                img_bytes = base64.b64decode(image_data)
+                image = self._loadImageFromBytes(img_bytes)
+                cv2.imwrite("image1.png", image)
+
+                data_batch = {
+                    "userID": user_id,
+                    "fullName": user_name,
+                    "email": "david@example.com",
+                    "Images": image_data,
+                    "incomplete": True,
+                }
+
+                self.database.changeData(data_batch=data_batch, change_type=change_type)
+
+                return jsonify({"status": "success", "message": "Image received"}), 200
+            except Exception as e:
+                print(f"Error: {e}")
+                return jsonify({"status": "false", "message": str(e)}), 500
+
+        @self.app.route("/delete", methods=["POST"])
+        def deleteUserData():
+            try:
+                data = request.json
+                user_id = data.get("userID", "unknown")
+
+                self.database.deleteData(user_id)
+
+                return jsonify({"status": "success", "message": "Image received"}), 200
+            except Exception as e:
+                print(f"Error: {e}")
+                return jsonify({"status": "false", "message": str(e)}), 500
 
         @self.app.route("/recogn", methods=["POST"])
         def recognFace():
@@ -157,18 +186,7 @@ class FlaskApp:
                 print(e)
                 return jsonify({"error": str(e)}), 500
 
-    def clear(self):
-        print("Clearing data due to inactivity...")
-        # self.trainer.clear()
-
-    def reset_inactivity_timer(self):
-        if self.inactivity_timer.is_alive():
-            self.inactivity_timer.cancel()
-        self.inactivity_timer = Timer(self.inactivity_timeout, self.clear)
-        self.inactivity_timer.start()
-
     def run(self):
-        self._startTunnel()
         self.app.run(host="0.0.0.0", port=5000)
 
 

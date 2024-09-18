@@ -3,7 +3,7 @@ import 'package:camera/camera.dart';
 // import 'userNameScreen.dart';
 import 'registerScreen.dart';
 import 'testScreen.dart';
-// import 'recognitionScreen.dart';
+import 'recognitionScreen.dart';
 
 class HomeScreen extends StatelessWidget {
   final List<CameraDescription> cameras;
@@ -39,7 +39,7 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      // builder: (context) => RecognitionScreen(cameras: cameras),
+                      // builder: (context) => RecognitionScreen(cameras: cameras)),
                       builder: (context) => CameraCircle(cameras: cameras)),
                 );
               },

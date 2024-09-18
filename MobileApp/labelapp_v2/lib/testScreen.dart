@@ -1,16 +1,44 @@
-import 'dart:async';
-import 'dart:typed_data';
-import 'dart:ui' as ui;
-import 'dart:io';
-import 'dart:typed_data';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image/image.dart' as imglib;
+import 'dart:io';
+import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
+import 'homeScreen.dart';
 import 'config.dart';
+
+import 'dart:typed_data';
+
+class SimpleSemaphore {
+  int _available;
+  final List<Completer<void>> _waiters = [];
+
+  SimpleSemaphore(this._available);
+
+  Future<void> acquire() {
+    if (_available > 0) {
+      _available--;
+      return Future.value();
+    } else {
+      final completer = Completer<void>();
+      _waiters.add(completer);
+      return completer.future;
+    }
+  }
+
+  void release() {
+    if (_waiters.isNotEmpty) {
+      final completer = _waiters.removeAt(0);
+      completer.complete();
+    } else {
+      _available++;
+    }
+  }
+}
 
 class CameraCircle extends StatefulWidget {
   final List<CameraDescription> cameras;
@@ -26,8 +54,18 @@ class _CameraCircleState extends State<CameraCircle> {
 
   final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector();
   final int _totalSegments = 11;
+  final double mirror = pi;
   List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
   Timer? _timer;
+  final semaphore = SimpleSemaphore(1);
+  Future<void> _sendImageToServerWithLimit(CameraImage image) async {
+    await semaphore.acquire();
+    try {
+      await _sendImageToServer(image);
+    } finally {
+      semaphore.release();
+    }
+  }
 
   Uint8List convertImageToGrayscaleBytes(imglib.Image imgImage) {
     final start_time = DateTime.now();
@@ -57,28 +95,26 @@ class _CameraCircleState extends State<CameraCircle> {
   Future<Uint8List> _convertImageToPng(CameraImage image) async {
     try {
       final start_time = DateTime.now();
-      // const delayDuration = Duration(milliseconds: 345);
-      // await Future.delayed(delayDuration);
       imglib.Image imgImage;
       Uint8List imageBytes;
 
       if (image.format.group == ImageFormatGroup.yuv420) {
         imgImage = _convertYUV420(image);
-        imageBytes = imgImage.getBytes();
+        // imageBytes = imgImage.getBytes();
       } else if (image.format.group == ImageFormatGroup.bgra8888) {
         imgImage = _convertBGRA8888(image);
-        imageBytes = imgImage.getBytes();
+        // imageBytes = imgImage.getBytes();
       } else {
         throw Exception('Unsupported image format');
       }
-      // imageBytes = convertImageToGrayscaleBytes(imgImage);
+      imageBytes = convertImageToGrayscaleBytes(imgImage);
       print('Image size: ${imageBytes.length} bytes');
       // imglib.encodeJpg(imgImage, quality: 80);
 
       // Uint8List imgImage_ = Uint8List.fromList(imglib.encodePng(imgImage));
-      Uint8List imgImage_ =
-          Uint8List.fromList(imglib.encodeJpg(imgImage, quality: 80));
-      print('imageBytes size: ${imgImage_.length} bytes');
+      // Uint8List imgImage_ =
+      //     Uint8List.fromList(imglib.encodeJpg(imgImage, quality: 80));
+      // print('imageBytes size: ${imgImage_.length} bytes');
       final end_time = DateTime.now();
       final elapsed_time = end_time.difference(start_time).inMilliseconds;
       print('function _convertImageToPng pocessing__: $elapsed_time ms');
@@ -131,14 +167,17 @@ class _CameraCircleState extends State<CameraCircle> {
     return convertedImage;
   }
 
-  Future<void> _sendImageToServer(Uint8List pngBytes) async {
+  Future<void> _sendImageToServer(CameraImage image) async {
     try {
+      final start_time = DateTime.now();
+      final imageBytes = await _convertImageToPng(image);
+
       final url = Uri.parse(AppConfig.http_url + "/pushimages");
 
       final request = http.Request('POST', url);
 
       // Thêm dữ liệu byte vào body của request
-      request.bodyBytes = pngBytes;
+      request.bodyBytes = imageBytes;
 
       // Đặt header để server biết loại dữ liệu
       request.headers['Content-Type'] = 'application/octet-stream';
@@ -151,6 +190,9 @@ class _CameraCircleState extends State<CameraCircle> {
         } else {
           print('Error while sending photo: ${response.statusCode}');
         }
+        final end_time = DateTime.now();
+        final elapsed_time = end_time.difference(start_time).inMilliseconds;
+        print('function _sendImageToServer pocessing__: $elapsed_time ms');
       } catch (e) {
         print('Error while sending photo: $e');
       }
@@ -173,7 +215,7 @@ class _CameraCircleState extends State<CameraCircle> {
     _initializeControllerFuture = _controller.initialize();
     _initializeControllerFuture.then((_) {
       _controller.startImageStream((image) async {
-        _processImageStream(image);
+        await _processImageStream(image);
       });
     }).catchError((e) {
       print('Error initializing camera: $e');
@@ -194,7 +236,34 @@ class _CameraCircleState extends State<CameraCircle> {
     );
   }
 
-  void _processImageStream(CameraImage image) async {
+  Future<bool> _sendImagesToServer(CameraImage image, String imageID) async {
+    try {
+      Uint8List imageBytes = await _convertImageToPng(image);
+      final response = await http.post(
+        Uri.parse(AppConfig.http_url + "/pushimages"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'images': imageBytes,
+          'userName': "widget.userName",
+          'imageID': imageID,
+        }),
+      );
+      if (response.statusCode == 200) {
+        print('Images uploaded successfully');
+        return true;
+      } else {
+        print('Failed to upload images');
+        return false;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return false;
+    }
+  }
+
+  Future<void> _processImageStream(CameraImage image) async {
     try {
       final start_time = DateTime.now();
 
@@ -218,7 +287,9 @@ class _CameraCircleState extends State<CameraCircle> {
       // _sendImageToServer(imgImage_);
       if (imageByte != null) {
         // await _sendImageToServer(pngBytes);
-        _detectFaces(imageByte);
+        // _detectFaces(imageByte);
+        await _sendImageToServer(image);
+        // await _sendImagesToServer((image), "21");
       } else {
         print("Error converting image to PNG");
       }
@@ -240,7 +311,7 @@ class _CameraCircleState extends State<CameraCircle> {
         bytesPerRow: 0,
       );
 
-      // final inputImage = InputImage.fromFilePath(image.path);
+      // final inputImage = InputImage.fromBytes(bytes: bytes, metadata: metadata)
       final inputImage = InputImage.fromBytes(bytes: image, metadata: metadata);
       final startTime = DateTime.now(); // start
       final List<Face> faces = await _faceDetector.processImage(inputImage);
@@ -278,7 +349,11 @@ class _CameraCircleState extends State<CameraCircle> {
         future: _initializeControllerFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
-            return CameraPreview(_controller);
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.rotationY(mirror),
+              child: CameraPreview(_controller),
+            );
           } else {
             return Center(child: CircularProgressIndicator());
           }

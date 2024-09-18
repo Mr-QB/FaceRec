@@ -6,3 +6,5 @@ h5py
 torch
 scikit-learn
 tables
+pandas
+numpy
