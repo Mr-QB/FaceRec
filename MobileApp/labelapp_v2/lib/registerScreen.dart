@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image/image.dart' as imglib;
 import 'dart:io';
-import 'package:intl/intl.dart';
+// import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -25,13 +25,8 @@ class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector();
-  int _currentStep = 0;
-  Timer? _timer;
-  late String _imageID = _instructions[_currentStep];
-  late String _instructionsTitle = _instructions[_currentStep];
-  final int _totalSegments = 11;
-  List<Color> _segmentColors = List.generate(11, (index) => Colors.grey);
-  List<Map<String, CameraImage>> capturedImages = [];
+  // int _currentStep = 0;
+  // Timer? _timer;
 
   final List<String> _instructions = [
     'Look Straight',
@@ -40,12 +35,13 @@ class _CameraScreenState extends State<CameraScreen> {
     'Look Up',
     'Look Down',
     'Tilt Head Left',
-    'Tilt Head Up Left',
-    'Tilt Head Down Left',
     'Tilt Head Right',
-    'Tilt Head Up Right',
-    'Tilt Head Down Right',
   ];
+  // late String _imageID = _instructions[_currentStep];
+  // late String _instructionsTitle = _instructions[_currentStep];
+  late int _totalSegments = _instructions.length;
+  List<Color> _segmentColors = List.generate(7, (index) => Colors.grey);
+  List<Map<String, CameraImage>> capturedImages = [];
 
   @override
   void initState() {
@@ -134,42 +130,17 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  void _stopCameraStream() async {
+  void _backToHome() async {
     if (_controller != null && _controller.value.isStreamingImages) {
       await _controller.stopImageStream();
     }
     await _controller.dispose();
-  }
-
-  Future<bool> _sendImagesToServer(Uint8List imageBytes, String imageID) async {
-    try {
-      final response = await http.post(
-        Uri.parse(AppConfig.http_url + "/pushimages"),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'images': imageBytes,
-          'userName': widget.userName,
-          'imageID': imageID,
-        }),
-      );
-      if (response.statusCode == 200) {
-        print('Images uploaded successfully');
-        setState(() {
-          _segmentColors[_currentStep] = Colors.green;
-          _currentStep++;
-          _instructionsTitle = _instructions[_currentStep];
-        });
-        return true;
-      } else {
-        print('Failed to upload images');
-        return false;
-      }
-    } catch (e) {
-      print('Error: $e');
-      return false;
-    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(cameras: widget.cameras),
+      ),
+    );
   }
 
   @override
@@ -260,43 +231,57 @@ class _CameraScreenState extends State<CameraScreen> {
 
     capturedImages.removeWhere((item) => selectedImages.contains(item));
 
+    List<Map<String, Uint8List>> imageFace = [];
     for (var item in selectedImages) {
-      // String instruction = item.keys.first;
       String instruction = item.keys.first;
       CameraImage? cameraImage = item[instruction];
 
       if (cameraImage != null) {
         Uint8List imageBytes = await _convertImageToPng(cameraImage);
-
-        await _sendImagesToServer(imageBytes, _imageID);
+        imageFace.add({
+          instruction: imageBytes,
+        });
+      }
+      if (await _postUserAPI(imageFace)) {
+        _backToHome();
       }
     }
+  }
 
-    // try {
-    //   bool success = await _sendImagesToServer(imageBytes, _imageID);
-    //   if (success) {
-    //     _imageID = _instructions[_currentStep];
-    //   }
+  Future<bool> _postUserAPI(List<Map<String, Uint8List>> imageFace) async {
+    try {
+      Map<String, String> imagesMap = {};
+      for (var item in imageFace) {
+        String instruction = item.keys.first;
+        Uint8List imageBytes = item[instruction]!;
+        String base64Image = base64Encode(imageBytes);
+        imagesMap[instruction] = base64Image;
+      }
 
-    //   //   if (_currentStep == _instructions.length) {
-    //   //     _instructionsTitle = "Face scanning completed, please wait a moment";
-    //   //     _timer?.cancel();
+      final jsonData = {
+        'images': imagesMap,
+        'userName': widget.userName,
+      };
 
-    //   //     Navigator.push(
-    //   //       context,
-    //   //       MaterialPageRoute(
-    //   //         builder: (context) {
-    //   //           _stopCameraStream();
-    //   //           return HomeScreen(cameras: widget.cameras);
-    //   //         },
-    //   //       ),
-    //   //     );
-    //   //   } else {
-    //   //     setState(() {});
-    //   //   }
-    // } catch (e) {
-    //   print("error in here: ${e}");
-    // }
+      final response = await http.post(
+        Uri.parse(AppConfig.http_url + "/user"),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(jsonData),
+      );
+
+      if (response.statusCode == 200) {
+        print('Images uploaded successfully');
+        return true;
+      } else {
+        print('Failed to upload images');
+        return false;
+      }
+    } catch (e) {
+      print('Error: $e');
+      return false;
+    }
   }
 
   void _processImageStream(BuildContext context, CameraImage image) async {
@@ -387,24 +372,51 @@ class _CameraScreenState extends State<CameraScreen> {
     return faces;
   }
 
-  int countUniqueInstructions(List<Map<String, dynamic>> capturedImages) {
+  int countUniqueInstructions(List<Map<String, CameraImage>> capturedImages) {
     Set<String> uniqueInstructions = {};
-
-    for (var item in capturedImages) {
-      uniqueInstructions.add(item['instruction']);
+    try {
+      for (var item in capturedImages) {
+        for (var instruction in item.keys) {
+          uniqueInstructions.add(instruction);
+        }
+      }
+    } catch (e) {
+      print("function countUniqueInstructions error: $e");
     }
-
+    _updateProgress(uniqueInstructions.length);
+    print(uniqueInstructions);
     return uniqueInstructions.length;
   }
 
-  void addImage(Map<String, CameraImage> newImage,
-      List<Map<String, CameraImage>> capturedImages, String instruction) {
+  void _updateProgress(int uniqueCount) {
+    List<Color> colors = List.generate(
+      uniqueCount,
+      (index) => Colors.green,
+    );
+
+    if (colors.length < _totalSegments) {
+      colors.addAll(List<Color>.filled(
+        _totalSegments - colors.length,
+        Colors.grey,
+      ));
+    }
+
+    setState(() {
+      _segmentColors = colors;
+    });
+  }
+
+  void addImage(
+      Map<String, CameraImage> newImage,
+      List<Map<String, CameraImage>> capturedImages,
+      String instruction_current) {
+    String instruction = newImage.keys.first;
     int count = capturedImages
-        .where((item) => item['instruction'] == instruction)
+        .where((item) => item.keys.first == instruction_current)
         .length;
 
-    if (newImage['instruction'] == 'Look Straight' && count >= 2) {
-      print('Cannot add more "Look Straight" instructions, limit reached.');
+    if (instruction == instruction && count >= 2) {
+      print('Cannot add more "$instruction" instructions, limit reached.');
     } else {
       capturedImages.add(newImage);
       print('Image added: $newImage');
@@ -412,59 +424,49 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _checkFaceAngle(List<Face> faces, CameraImage image) {
-    final face = faces.first;
-    final headEulerAngleY = face.headEulerAngleY;
-    final headEulerAngleZ = face.headEulerAngleZ;
-    final headEulerAngleX = face.headEulerAngleX;
+    try {
+      final face = faces.first;
+      final headEulerAngleY = face.headEulerAngleY;
+      final headEulerAngleZ = face.headEulerAngleZ;
+      final headEulerAngleX = face.headEulerAngleX;
 
-    print('headEulerAngleY: $headEulerAngleY');
-    print('headEulerAngleZ: $headEulerAngleZ');
-    print('headEulerAngleX: $headEulerAngleX');
+      print('headEulerAngleY: $headEulerAngleY');
+      print('headEulerAngleZ: $headEulerAngleZ');
+      print('headEulerAngleX: $headEulerAngleX');
 
-    if (headEulerAngleY!.abs() < 10 && headEulerAngleZ!.abs() < 10) {
-      addImage({
-        'Look Straight': image,
-      }, capturedImages, _instructions[0]);
-    } else if (headEulerAngleY > 20) {
-      addImage({
-        'Turn Left': image, // 'Turn Left'
-      }, capturedImages, _instructions[1]);
-    } else if (headEulerAngleY < -20) {
-      addImage({
-        'Turn Right': image, // 'Turn Right'
-      }, capturedImages, _instructions[2]);
-    } else if (headEulerAngleX! > 15) {
-      addImage({
-        'Look Up': image,
-      }, capturedImages, _instructions[3]);
-    } else if (headEulerAngleX < -15) {
-      addImage({
-        'Look Down': image,
-      }, capturedImages, _instructions[4]);
-    } else if (headEulerAngleZ! < -15) {
-      addImage({
-        'Tilt Head Left': image,
-      }, capturedImages, _instructions[5]);
-    } else if (headEulerAngleX > 15 && headEulerAngleZ < -15) {
-      addImage({
-        'Tilt Head Up Left': image,
-      }, capturedImages, _instructions[6]);
-    } else if (headEulerAngleX < -15 && headEulerAngleZ < -15) {
-      addImage({
-        'Tilt Head Down Left': image,
-      }, capturedImages, _instructions[7]);
-    } else if (headEulerAngleZ > 15) {
-      addImage({
-        'Tilt Head Right': image,
-      }, capturedImages, _instructions[8]);
-    } else if (headEulerAngleX > 15 && headEulerAngleZ > 15) {
-      addImage({
-        'Tilt Head Up Right': image,
-      }, capturedImages, _instructions[9]);
-    } else if (headEulerAngleX < -15 && headEulerAngleZ > -15) {
-      addImage({
-        'Tilt Head Down Right': image,
-      }, capturedImages, _instructions[10]);
+      if (headEulerAngleY!.abs() < 10 && headEulerAngleZ!.abs() < 10) {
+        addImage({
+          'Look Straight': image,
+        }, capturedImages, _instructions[0]);
+      } else if (headEulerAngleX! > 20) {
+        addImage({
+          'Look Up': image,
+        }, capturedImages, _instructions[3]);
+      } else if (headEulerAngleX < -20) {
+        addImage({
+          'Look Down': image,
+        }, capturedImages, _instructions[4]);
+      } else if (headEulerAngleY < -10 &&
+          (headEulerAngleX! > 2 || headEulerAngleX < -5)) {
+        addImage({
+          'Tilt Head Left': image,
+        }, capturedImages, _instructions[5]);
+      } else if (headEulerAngleY > 10 &&
+          (headEulerAngleX! > 2 || headEulerAngleX < -5)) {
+        addImage({
+          'Tilt Head Right': image,
+        }, capturedImages, _instructions[6]);
+      } else if (headEulerAngleY > 15) {
+        addImage({
+          'Turn Left': image,
+        }, capturedImages, _instructions[1]);
+      } else if (headEulerAngleY < -15) {
+        addImage({
+          'Turn Right': image,
+        }, capturedImages, _instructions[2]);
+      }
+    } catch (e) {
+      print("Error checking face pose: " + e.toString());
     }
   }
 
@@ -518,13 +520,13 @@ class _CameraScreenState extends State<CameraScreen> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 46.0),
+                  SizedBox(height: 86.0),
                   Text(
-                    _instructionsTitle,
+                    "Please move your face slowly in a circular motion.",
                     // _instructions[_currentStep],
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 17.0,
+                      fontSize: 15.0,
                     ),
                   ),
                 ],
