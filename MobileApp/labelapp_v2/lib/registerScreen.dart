@@ -4,7 +4,6 @@ import 'package:camera/camera.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image/image.dart' as imglib;
 import 'dart:io';
-// import 'package:intl/intl.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -25,8 +24,7 @@ class _CameraScreenState extends State<CameraScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
   final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector();
-  // int _currentStep = 0;
-  // Timer? _timer;
+  bool first_submit = true;
 
   final List<String> _instructions = [
     'Look Straight',
@@ -37,11 +35,11 @@ class _CameraScreenState extends State<CameraScreen> {
     'Tilt Head Left',
     'Tilt Head Right',
   ];
-  // late String _imageID = _instructions[_currentStep];
-  // late String _instructionsTitle = _instructions[_currentStep];
+  late List<String> _missing_images = List.from(_instructions);
   late int _totalSegments = _instructions.length;
   List<Color> _segmentColors = List.generate(7, (index) => Colors.grey);
   List<Map<String, CameraImage>> capturedImages = [];
+  final int user_id = 1;
 
   @override
   void initState() {
@@ -183,47 +181,13 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  Future<void> deleteAllCapturedImages(List<File> imageFiles) async {
-    for (final file in imageFiles) {
-      try {
-        await file.delete();
-        print("Deleted: ${file.path}");
-      } catch (e) {
-        print("Error deleting file: ${file.path}, Error: $e");
-      }
-    }
-  }
-
-  void removeFirstUniqueImages(
-      List<Map<String, dynamic>> capturedImages, List<String> _instructions) {
-    // Tạo Set để lưu những instruction đã gặp
-    Set<String> seenInstructions = {};
-    List<Map<String, dynamic>> imagesToRemove = [];
-
-    for (var item in capturedImages) {
-      String instruction = item['instruction'];
-
-      // Kiểm tra nếu instruction thuộc _instructions và chưa gặp trước đó
-      if (_instructions.contains(instruction) &&
-          !seenInstructions.contains(instruction)) {
-        imagesToRemove.add(item);
-        seenInstructions.add(instruction); // Đánh dấu instruction đã gặp
-      }
-    }
-
-    // Xóa các phần tử lần đầu tiên gặp
-    capturedImages.removeWhere((item) => imagesToRemove.contains(item));
-
-    // In ra các phần tử đã xóa
-    print('Removed images: $imagesToRemove');
-  }
-
   void _processFaceDetection() async {
     List<Map<String, CameraImage>> selectedImages = [];
     Set<String> encounteredInstructions = {};
     for (var item in capturedImages) {
       String instruction = item.keys.first;
-      if (!encounteredInstructions.contains(instruction)) {
+      if (_missing_images.contains(instruction) &&
+          !encounteredInstructions.contains(instruction)) {
         encounteredInstructions.add(instruction);
         selectedImages.add(item);
       }
@@ -242,13 +206,21 @@ class _CameraScreenState extends State<CameraScreen> {
           instruction: imageBytes,
         });
       }
-      if (await _postUserAPI(imageFace)) {
+    }
+    if (first_submit) {
+      first_submit = false;
+      if (await _postToAPI(imageFace, "/user")) {
+        _backToHome();
+      }
+    } else {
+      if (await _postToAPI(imageFace, "/update/$user_id")) {
         _backToHome();
       }
     }
   }
 
-  Future<bool> _postUserAPI(List<Map<String, Uint8List>> imageFace) async {
+  Future<bool> _postToAPI(
+      List<Map<String, Uint8List>> imageFace, String api) async {
     try {
       Map<String, String> imagesMap = {};
       for (var item in imageFace) {
@@ -257,14 +229,14 @@ class _CameraScreenState extends State<CameraScreen> {
         String base64Image = base64Encode(imageBytes);
         imagesMap[instruction] = base64Image;
       }
-
       final jsonData = {
         'images': imagesMap,
         'userName': widget.userName,
+        'type': "add",
       };
 
       final response = await http.post(
-        Uri.parse(AppConfig.http_url + "/user"),
+        Uri.parse(AppConfig.http_url + api),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -272,8 +244,16 @@ class _CameraScreenState extends State<CameraScreen> {
       );
 
       if (response.statusCode == 200) {
-        print('Images uploaded successfully');
-        return true;
+        final responseData = jsonDecode(response.body);
+        _missing_images.removeWhere((element) =>
+            (responseData['eligibleImages'] ?? []).contains(element));
+
+        if (_missing_images.isNotEmpty) {
+          print('Missing images: $_missing_images');
+          return false;
+        } else {
+          return true;
+        }
       } else {
         print('Failed to upload images');
         return false;
@@ -297,11 +277,11 @@ class _CameraScreenState extends State<CameraScreen> {
       }
 
       if (imageByte != null) {
-        // await _sendImageToServer(pngBytes);
         final faces = await _detectFaces(imageByte);
         _checkFaceAngle(faces, image);
 
-        if (countUniqueInstructions(capturedImages) == _instructions.length) {
+        if (countUniqueInstructions(capturedImages, _missing_images) ==
+            _missing_images.length) {
           _processFaceDetection();
         } else {
           showCustomToast(
@@ -309,6 +289,7 @@ class _CameraScreenState extends State<CameraScreen> {
             'Face is not at the correct angle. Please try again.',
           );
         }
+        _updateProgress();
       } else {
         print("Error converting image to PNG");
       }
@@ -347,7 +328,6 @@ class _CameraScreenState extends State<CameraScreen> {
         rotation = InputImageRotation.rotation0deg;
         break;
     }
-    print("sensorOrientation ${rotation.toString()}");
 
     final metadata = createMetadata(
       size: Size(320, 240),
@@ -357,40 +337,34 @@ class _CameraScreenState extends State<CameraScreen> {
     );
 
     final inputImage = InputImage.fromBytes(bytes: image, metadata: metadata);
-    final startTime = DateTime.now(); // start
     final List<Face> faces = await _faceDetector.processImage(inputImage);
-    if (faces.isEmpty) {
-      print("not face");
-    } else {
-      print("have face");
-    }
-
-    final endTime = DateTime.now(); // end
-    final duration = endTime.difference(startTime);
-    print("Time taken to detect faces: ${duration.inMilliseconds} ms");
 
     return faces;
   }
 
-  int countUniqueInstructions(List<Map<String, CameraImage>> capturedImages) {
+  int countUniqueInstructions(List<Map<String, CameraImage>> capturedImages,
+      List<String> _missing_images) {
     Set<String> uniqueInstructions = {};
     try {
       for (var item in capturedImages) {
         for (var instruction in item.keys) {
-          uniqueInstructions.add(instruction);
+          if (_missing_images.contains(instruction)) {
+            uniqueInstructions.add(instruction);
+          }
         }
       }
     } catch (e) {
       print("function countUniqueInstructions error: $e");
     }
-    _updateProgress(uniqueInstructions.length);
-    print(uniqueInstructions);
+    print(uniqueInstructions.length);
+
     return uniqueInstructions.length;
   }
 
-  void _updateProgress(int uniqueCount) {
+  void _updateProgress() {
+    int current_progress = _instructions.length - _missing_images.length;
     List<Color> colors = List.generate(
-      uniqueCount,
+      current_progress,
       (index) => Colors.green,
     );
 
@@ -415,11 +389,10 @@ class _CameraScreenState extends State<CameraScreen> {
         .where((item) => item.keys.first == instruction_current)
         .length;
 
-    if (instruction == instruction && count >= 2) {
-      print('Cannot add more "$instruction" instructions, limit reached.');
+    if (instruction == instruction && count >= 5) {
+      // print('Cannot add more "$instruction" instructions, limit reached.');
     } else {
       capturedImages.add(newImage);
-      print('Image added: $newImage');
     }
   }
 
@@ -430,10 +403,6 @@ class _CameraScreenState extends State<CameraScreen> {
       final headEulerAngleZ = face.headEulerAngleZ;
       final headEulerAngleX = face.headEulerAngleX;
 
-      print('headEulerAngleY: $headEulerAngleY');
-      print('headEulerAngleZ: $headEulerAngleZ');
-      print('headEulerAngleX: $headEulerAngleX');
-
       if (headEulerAngleY!.abs() < 10 && headEulerAngleZ!.abs() < 10) {
         addImage({
           'Look Straight': image,
@@ -442,7 +411,7 @@ class _CameraScreenState extends State<CameraScreen> {
         addImage({
           'Look Up': image,
         }, capturedImages, _instructions[3]);
-      } else if (headEulerAngleX < -20) {
+      } else if (headEulerAngleX < -15) {
         addImage({
           'Look Down': image,
         }, capturedImages, _instructions[4]);

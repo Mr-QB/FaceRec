@@ -69,7 +69,6 @@ class FaceDetector:
 
     def getFace(self, image: np.ndarray):
         resized_image = cv2.resize(image, (self.w_fd, self.h_fd))
-        cv2.imwrite("image2.png", resized_image)
         resized_image = resized_image.transpose(
             SHAPE_OF_TRANSPOSE
         )  # Change data layout from HWC to CHW

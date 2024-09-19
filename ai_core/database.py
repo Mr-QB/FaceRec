@@ -19,31 +19,40 @@ class HrmDatabase:
 
         self.database = self._loadData()
         self.arcface_extractor = Extractor()
+        self.changed = False
+        self.new_data = False
 
     def _loadData(self):
         try:
-            with open(FACEDATA, "rb") as f:
+            with open(DATABASE, "rb") as f:
                 database = pickle.load(f)
         except (FileNotFoundError, KeyError):
             database = pd.DataFrame(columns=self.data_structures)
         return database
 
     def addNew(self, data_batch):
+        if data_batch["userID"] in self.database["userID"].values:
+            return True
+
         complete_data = {
             col: data_batch.get(col, np.nan) for col in self.data_structures
         }
         complete_data["arcfaceFeatures"] = self.arcface_extractor.featureEmbedding(
             complete_data["images"]
         )
-        if len(complete_data["arcfaceFeatures"]) < 11:
-            complete_data["incomplete"] = False
-        else:
+        if len(complete_data["arcfaceFeatures"]) < NUMBER_POSE_HEAD:
             complete_data["incomplete"] = True
+
+        else:
+            self.new_data = True
+            complete_data["incomplete"] = False
+
         new_row_dt = pd.DataFrame([complete_data])
         self.database = pd.concat([self.database, new_row_dt], ignore_index=True)
-        self.database = self.database.append(complete_data, ignore_index=True)
+        self._saveData()
 
     def deleteData(self, deletion_item):
+        self.changed = True
         if deletion_item in self.database["userID"].values:
             self.database = self.database[self.database["userID"] != deletion_item]
             self._saveData()
@@ -79,8 +88,9 @@ class HrmDatabase:
                     self.database.at[index, key] = value
 
             self.database.at[index, "incomplete"] = (
-                len(self.database.loc[index]["arcfaceFeatures"]) < 11
+                len(self.database.loc[index]["arcfaceFeatures"]) < NUMBER_POSE_HEAD
             )
+            self.new_data = ~self.database.at[index, "incomplete"]
 
             self._saveData()
 
@@ -88,5 +98,5 @@ class HrmDatabase:
             return False
 
     def _saveData(self):
-        with open(FACEDATA, "wb") as data_file:
+        with open(DATABASE, "wb") as data_file:
             pickle.dump(self.database, data_file)

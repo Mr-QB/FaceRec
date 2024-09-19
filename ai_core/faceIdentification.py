@@ -16,7 +16,6 @@ class FaceIdentifier:
     def __init__(self):
         checkAndDownloaFile(ARCFACE_MODEL_PATH, ARCFACE_MODEL_URL)
         self.face_rec = ArcFace.ArcFace(ARCFACE_MODEL_PATH)
-        self.data_face = pd.read_hdf("faceData/face_data.h5", "df")
         self.threshold = FACE_VERIFY_THRESHOLD
         self.anti_spoofing = AntiSpoofing()
         self._loadModel()

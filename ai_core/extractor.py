@@ -1,4 +1,5 @@
 from arcface import ArcFace
+import numpy as np
 
 from ai_core.faceDetect import FaceDetector
 from ai_core.utility import checkAndDownloaFile
@@ -14,5 +15,5 @@ class Extractor:
     def featureEmbedding(self, image_faces):
         embeddings = []
         for image in image_faces:
-            embeddings.append(self.face_rec.calc_emb(image))
+            embeddings.append(self.face_rec.calc_emb(np.copy(image)))
         return embeddings

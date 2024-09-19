@@ -22,20 +22,20 @@ class Trainer:
 
     def _loadData(self):
         try:
-            with open(FACEDATA100, "rb") as f:
+            with open(DATABASE, "rb") as f:
                 self.database = pickle.load(f)
-            # self.face_data = pd.read_hdf("faceData/face_data.h5", key="df")
-            # index_to_drop = self.face_data[self.face_data["label"] == "QBao"].index
-            # self.face_data = self.face_data.drop(index_to_drop)
+                self.database = self.database.loc[self.database["incomplete"] == False]
         except (FileNotFoundError, KeyError):
-            self.database = pd.DataFrame(columns=["label", "embedding", "imageID"])
+            print("can't open/read file: check file path/integrity")
 
     def _saveData(self, lr_model, label_encoder):
         combined_model = {"model": lr_model, "label_encoder": label_encoder}
         with open(LR_FACE_MODEL_PATH, "wb") as f:
             pickle.dump(combined_model, f)
+        print("Trainning done...")
 
     def train(self):
+        # try:
         self._loadData()
 
         embeddings, labels = [], []
@@ -52,6 +52,15 @@ class Trainer:
         X = np.array(embeddings)
         y = np.array(labels_encoded)
 
+        unique_classes = np.unique(y)
+        if len(unique_classes) < 2:
+            print("Only one class found. Adding a dummy class for training.")
+            dummy_class = 1 if unique_classes[0] == 0 else 0
+            X_dummy = np.copy(X)
+            y_dummy = np.full(X.shape[0], dummy_class)
+            X = np.vstack([X, X_dummy])
+            y = np.concatenate([y, y_dummy])
+
         lr_model = make_pipeline(
             StandardScaler(),
             LogisticRegression(multi_class="multinomial", solver="lbfgs"),
@@ -60,3 +69,6 @@ class Trainer:
 
         self._saveData(lr_model, label_encoder)
         return True
+
+    # except:
+    #     return False
