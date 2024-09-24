@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
-// import 'userNameScreen.dart';
-import 'registerScreen.dart';
-import 'testScreen.dart';
+import 'userNameScreen.dart';
 import 'recognitionScreen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -25,11 +23,11 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      // builder: (context) => UserNamePage(cameras: cameras)),
-                      builder: (context) => CameraScreen(
-                            cameras: cameras,
-                            userName: "quocbao",
-                          )),
+                      builder: (context) => UserNamePage(cameras: cameras)),
+                  // builder: (context) => CameraScreen(
+                  //       cameras: cameras,
+                  //       userName: "quocbao",
+                  //     )),
                 );
               },
             ),
@@ -39,8 +37,9 @@ class HomeScreen extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                      // builder: (context) => RecognitionScreen(cameras: cameras)),
-                      builder: (context) => CameraCircle(cameras: cameras)),
+                      builder: (context) =>
+                          RecognitionScreen(cameras: cameras)),
+                  // builder: (context) => CameraCircle(cameras: cameras)),
                 );
               },
             ),

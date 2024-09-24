@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:google_ml_kit/google_ml_kit.dart';
 import 'package:image/image.dart' as imglib;
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
@@ -13,19 +12,16 @@ import 'dart:typed_data';
 
 class CameraScreen extends StatefulWidget {
   final List<CameraDescription> cameras;
-  final String userName;
-  CameraScreen({required this.userName, required this.cameras});
+  final String user_name;
+  CameraScreen({required this.user_name, required this.cameras});
 
   @override
   _CameraScreenState createState() => _CameraScreenState();
 }
 
 class _CameraScreenState extends State<CameraScreen> {
-  late CameraController _controller;
-  late Future<void> _initializeControllerFuture;
-  final FaceDetector _faceDetector = GoogleMlKit.vision.faceDetector();
-  bool first_submit = true;
-
+  final FaceDetector _face_detector = GoogleMlKit.vision.faceDetector();
+  final int user_id = Random().nextInt(100);
   final List<String> _instructions = [
     'Look Straight',
     'Turn Left',
@@ -35,11 +31,14 @@ class _CameraScreenState extends State<CameraScreen> {
     'Tilt Head Left',
     'Tilt Head Right',
   ];
+
+  late List<Color> _segment_colors = List.generate(7, (index) => Colors.grey);
+  late List<Map<String, CameraImage>> captured_images = [];
+  late CameraController _controller;
   late List<String> _missing_images = List.from(_instructions);
-  late int _totalSegments = _instructions.length;
-  List<Color> _segmentColors = List.generate(7, (index) => Colors.grey);
-  List<Map<String, CameraImage>> capturedImages = [];
-  final int user_id = 1;
+  late int _total_segments = _instructions.length;
+  late Future<void> _initializeControllerFuture;
+  late bool _first_submit = true;
 
   @override
   void initState() {
@@ -49,19 +48,17 @@ class _CameraScreenState extends State<CameraScreen> {
 
   Future<Uint8List> _convertImageToPng(CameraImage image) async {
     try {
-      imglib.Image imgImage;
+      imglib.Image img_image;
       Uint8List imageBytes;
 
       if (image.format.group == ImageFormatGroup.yuv420) {
-        imgImage = _convertYUV420(image);
-        // imageBytes = imgImage.getBytes();
+        img_image = _convertYUV420(image);
       } else if (image.format.group == ImageFormatGroup.bgra8888) {
-        imgImage = _convertBGRA8888(image);
-        // imageBytes = imgImage.getBytes();
+        img_image = _convertBGRA8888(image);
       } else {
         throw Exception('Unsupported image format');
       }
-      final rotatedImage = imglib.copyRotate(imgImage, -90);
+      final rotatedImage = imglib.copyRotate(img_image, -90);
 
       imageBytes =
           Uint8List.fromList(imglib.encodeJpg(rotatedImage, quality: 80));
@@ -144,7 +141,7 @@ class _CameraScreenState extends State<CameraScreen> {
   @override
   void dispose() {
     _controller.dispose();
-    _faceDetector.close();
+    _face_detector.close();
     super.dispose();
   }
 
@@ -182,38 +179,38 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   void _processFaceDetection() async {
-    List<Map<String, CameraImage>> selectedImages = [];
+    List<Map<String, CameraImage>> selected_images = [];
     Set<String> encounteredInstructions = {};
-    for (var item in capturedImages) {
+    for (var item in captured_images) {
       String instruction = item.keys.first;
       if (_missing_images.contains(instruction) &&
           !encounteredInstructions.contains(instruction)) {
         encounteredInstructions.add(instruction);
-        selectedImages.add(item);
+        selected_images.add(item);
       }
     }
 
-    capturedImages.removeWhere((item) => selectedImages.contains(item));
+    captured_images.removeWhere((item) => selected_images.contains(item));
 
-    List<Map<String, Uint8List>> imageFace = [];
-    for (var item in selectedImages) {
+    List<Map<String, Uint8List>> image_face = [];
+    for (var item in selected_images) {
       String instruction = item.keys.first;
-      CameraImage? cameraImage = item[instruction];
+      CameraImage? camera_image = item[instruction];
 
-      if (cameraImage != null) {
-        Uint8List imageBytes = await _convertImageToPng(cameraImage);
-        imageFace.add({
+      if (camera_image != null) {
+        Uint8List imageBytes = await _convertImageToPng(camera_image);
+        image_face.add({
           instruction: imageBytes,
         });
       }
     }
-    if (first_submit) {
-      first_submit = false;
-      if (await _postToAPI(imageFace, "/user")) {
+    if (_first_submit) {
+      _first_submit = false;
+      if (await _postToAPI(image_face, "/user")) {
         _backToHome();
       }
     } else {
-      if (await _postToAPI(imageFace, "/update/$user_id")) {
+      if (await _postToAPI(image_face, "/user/$user_id")) {
         _backToHome();
       }
     }
@@ -222,17 +219,18 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<bool> _postToAPI(
       List<Map<String, Uint8List>> imageFace, String api) async {
     try {
-      Map<String, String> imagesMap = {};
+      Map<String, String> images_map = {};
       for (var item in imageFace) {
         String instruction = item.keys.first;
-        Uint8List imageBytes = item[instruction]!;
-        String base64Image = base64Encode(imageBytes);
-        imagesMap[instruction] = base64Image;
+        Uint8List image_bytes = item[instruction]!;
+        String base64_image = base64Encode(image_bytes);
+        images_map[instruction] = base64_image;
       }
-      final jsonData = {
-        'images': imagesMap,
-        'userName': widget.userName,
+      final json_data = {
+        'images': images_map,
+        'userName': widget.user_name,
         'type': "add",
+        'userID': user_id,
       };
 
       final response = await http.post(
@@ -240,7 +238,7 @@ class _CameraScreenState extends State<CameraScreen> {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: jsonEncode(jsonData),
+        body: jsonEncode(json_data),
       );
 
       if (response.statusCode == 200) {
@@ -266,21 +264,21 @@ class _CameraScreenState extends State<CameraScreen> {
 
   void _processImageStream(BuildContext context, CameraImage image) async {
     try {
-      int totalLength =
+      int total_length =
           image.planes.fold(0, (sum, plane) => sum + plane.bytes.length);
 
-      Uint8List imageByte = Uint8List(totalLength);
+      Uint8List image_byte = Uint8List(total_length);
       int offset = 0;
       for (final plane in image.planes) {
-        imageByte.setRange(offset, offset + plane.bytes.length, plane.bytes);
+        image_byte.setRange(offset, offset + plane.bytes.length, plane.bytes);
         offset += plane.bytes.length;
       }
 
-      if (imageByte != null) {
-        final faces = await _detectFaces(imageByte);
+      if (image_byte != null) {
+        final faces = await _detectFaces(image_byte);
         _checkFaceAngle(faces, image);
 
-        if (countUniqueInstructions(capturedImages, _missing_images) ==
+        if (countUniqueInstructions(captured_images, _missing_images) ==
             _missing_images.length) {
           _processFaceDetection();
         } else {
@@ -302,13 +300,13 @@ class _CameraScreenState extends State<CameraScreen> {
     required Size size,
     required InputImageRotation rotation,
     required InputImageFormat format,
-    required int bytesPerRow,
+    required int bytes_perRow,
   }) {
     return InputImageMetadata(
       size: size,
       rotation: rotation,
       format: format,
-      bytesPerRow: bytesPerRow,
+      bytesPerRow: bytes_perRow,
     );
   }
 
@@ -333,32 +331,31 @@ class _CameraScreenState extends State<CameraScreen> {
       size: Size(320, 240),
       rotation: rotation,
       format: InputImageFormat.yuv420,
-      bytesPerRow: 0,
+      bytes_perRow: 0,
     );
 
-    final inputImage = InputImage.fromBytes(bytes: image, metadata: metadata);
-    final List<Face> faces = await _faceDetector.processImage(inputImage);
+    final input_image = InputImage.fromBytes(bytes: image, metadata: metadata);
+    final List<Face> faces = await _face_detector.processImage(input_image);
 
     return faces;
   }
 
-  int countUniqueInstructions(List<Map<String, CameraImage>> capturedImages,
+  int countUniqueInstructions(List<Map<String, CameraImage>> captured_images,
       List<String> _missing_images) {
-    Set<String> uniqueInstructions = {};
+    Set<String> unique_instructions = {};
     try {
-      for (var item in capturedImages) {
+      for (var item in captured_images) {
         for (var instruction in item.keys) {
           if (_missing_images.contains(instruction)) {
-            uniqueInstructions.add(instruction);
+            unique_instructions.add(instruction);
           }
         }
       }
     } catch (e) {
       print("function countUniqueInstructions error: $e");
     }
-    print(uniqueInstructions.length);
 
-    return uniqueInstructions.length;
+    return unique_instructions.length;
   }
 
   void _updateProgress() {
@@ -368,71 +365,71 @@ class _CameraScreenState extends State<CameraScreen> {
       (index) => Colors.green,
     );
 
-    if (colors.length < _totalSegments) {
+    if (colors.length < _total_segments) {
       colors.addAll(List<Color>.filled(
-        _totalSegments - colors.length,
+        _total_segments - colors.length,
         Colors.grey,
       ));
     }
 
     setState(() {
-      _segmentColors = colors;
+      _segment_colors = colors;
     });
   }
 
   void addImage(
-      Map<String, CameraImage> newImage,
-      List<Map<String, CameraImage>> capturedImages,
+      Map<String, CameraImage> new_image,
+      List<Map<String, CameraImage>> captured_images,
       String instruction_current) {
-    String instruction = newImage.keys.first;
-    int count = capturedImages
+    String instruction = new_image.keys.first;
+    int count = captured_images
         .where((item) => item.keys.first == instruction_current)
         .length;
 
     if (instruction == instruction && count >= 5) {
-      // print('Cannot add more "$instruction" instructions, limit reached.');
+      print('Cannot add more "$instruction" instructions, limit reached.');
     } else {
-      capturedImages.add(newImage);
+      captured_images.add(new_image);
     }
   }
 
   void _checkFaceAngle(List<Face> faces, CameraImage image) {
     try {
       final face = faces.first;
-      final headEulerAngleY = face.headEulerAngleY;
-      final headEulerAngleZ = face.headEulerAngleZ;
-      final headEulerAngleX = face.headEulerAngleX;
+      final head_euler_angle_y = face.headEulerAngleY;
+      final head_euler_angle_z = face.headEulerAngleZ;
+      final head_euler_angle_x = face.headEulerAngleX;
 
-      if (headEulerAngleY!.abs() < 10 && headEulerAngleZ!.abs() < 10) {
+      if (head_euler_angle_y!.abs() < 10 && head_euler_angle_z!.abs() < 10) {
         addImage({
           'Look Straight': image,
-        }, capturedImages, _instructions[0]);
-      } else if (headEulerAngleX! > 20) {
+        }, captured_images, _instructions[0]);
+      } else if (head_euler_angle_x! > 20) {
         addImage({
           'Look Up': image,
-        }, capturedImages, _instructions[3]);
-      } else if (headEulerAngleX < -15) {
+        }, captured_images, _instructions[3]);
+      } else if (head_euler_angle_x < -15) {
         addImage({
           'Look Down': image,
-        }, capturedImages, _instructions[4]);
-      } else if (headEulerAngleY < -10 &&
-          (headEulerAngleX! > 2 || headEulerAngleX < -5)) {
+        }, captured_images, _instructions[4]);
+      } else if (head_euler_angle_y < -10 &&
+          (head_euler_angle_x! > 2 || head_euler_angle_x < -5)) {
         addImage({
           'Tilt Head Left': image,
-        }, capturedImages, _instructions[5]);
-      } else if (headEulerAngleY > 10 &&
-          (headEulerAngleX! > 2 || headEulerAngleX < -5)) {
+        }, captured_images, _instructions[5]);
+      } else if (head_euler_angle_y > 10 &&
+          (head_euler_angle_x! > 2 || head_euler_angle_x < -5)) {
         addImage({
           'Tilt Head Right': image,
-        }, capturedImages, _instructions[6]);
-      } else if (headEulerAngleY > 15) {
+        }, captured_images, _instructions[6]);
+      } else if (head_euler_angle_y > 15) {
         addImage({
           'Turn Left': image,
-        }, capturedImages, _instructions[1]);
-      } else if (headEulerAngleY < -15) {
+        }, captured_images, _instructions[1]);
+      } else if (head_euler_angle_y < -15) {
         addImage({
           'Turn Right': image,
-        }, capturedImages, _instructions[2]);
+        }, captured_images, _instructions[2]);
       }
     } catch (e) {
       print("Error checking face pose: " + e.toString());
@@ -462,8 +459,8 @@ class _CameraScreenState extends State<CameraScreen> {
                       CustomPaint(
                         size: Size(circleDiameter + 8.0, circleDiameter + 8.0),
                         painter: ProgressBar(
-                          colors: _segmentColors,
-                          segments: _totalSegments,
+                          colors: _segment_colors,
+                          segments: _total_segments,
                         ),
                       ),
                       ClipOval(

@@ -17,13 +17,13 @@ class RecognitionScreen extends StatefulWidget {
 class _RecognitionScreenState extends State<RecognitionScreen> {
   late CameraController _controller;
   late Future<void> _initializeControllerFuture;
-  bool _isUsingFrontCamera = false;
+  bool _is_using_front_camera = true;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _initializeCameraController(widget.cameras[0]);
+    _initializeCameraController(widget.cameras[1]);
   }
 
   void _initializeCameraController(CameraDescription cameraDescription) {
@@ -53,12 +53,12 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   }
 
   void _sendImageStreamToServer(
-      BuildContext context, String base64Image) async {
+      BuildContext context, String base64_image) async {
     try {
       final response = await http.post(
-        Uri.parse(AppConfig.http_url + "/recogn"),
+        Uri.parse(AppConfig.http_url + "/recognize"),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'image': base64Image}),
+        body: jsonEncode({'image': base64_image}),
       );
 
       if (response.statusCode == 200) {
@@ -76,9 +76,9 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
   }
 
   void _showToastsForNames(BuildContext context, List<String> names) {
-    final List<OverlayEntry> toastEntries = [];
+    final List<OverlayEntry> toast_entries = [];
     for (int i = 0; i < names.length; i++) {
-      final overlayEntry = OverlayEntry(
+      final overlay_entry = OverlayEntry(
         builder: (context) => Positioned(
           top: MediaQuery.of(context).padding.top +
               16.0 +
@@ -104,13 +104,13 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
         ),
       );
 
-      toastEntries.add(overlayEntry);
+      toast_entries.add(overlay_entry);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final overlay = Overlay.of(context);
         if (overlay != null) {
-          overlay.insert(overlayEntry);
+          overlay.insert(overlay_entry);
           Future.delayed(Duration(milliseconds: 600), () {
-            overlayEntry.remove();
+            overlay_entry.remove();
           });
         }
       });
@@ -133,10 +133,11 @@ class _RecognitionScreenState extends State<RecognitionScreen> {
           IconButton(
             icon: Icon(Icons.switch_camera),
             onPressed: () {
-              final cameraDescription =
-                  _isUsingFrontCamera ? widget.cameras[0] : widget.cameras[1];
+              final cameraDescription = _is_using_front_camera
+                  ? widget.cameras[0]
+                  : widget.cameras[1];
               setState(() {
-                _isUsingFrontCamera = !_isUsingFrontCamera;
+                _is_using_front_camera = !_is_using_front_camera;
                 _initializeCameraController(cameraDescription);
               });
             },

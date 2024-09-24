@@ -15,13 +15,13 @@ class _UserNamePageState extends State<UserNamePage> {
   final TextEditingController _controller = TextEditingController();
 
   void _navigateToCameraScreen() {
-    final userName = _controller.text;
-    if (userName.isNotEmpty) {
+    final user_name = _controller.text;
+    if (user_name.isNotEmpty) {
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => CameraScreen(
-            userName: userName,
+            user_name: user_name,
             cameras: widget.cameras,
           ),
         ),

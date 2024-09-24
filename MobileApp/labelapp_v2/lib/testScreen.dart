@@ -94,7 +94,6 @@ class _CameraCircleState extends State<CameraCircle> {
 
   Future<Uint8List> _convertImageToPng(CameraImage image) async {
     try {
-      final start_time = DateTime.now();
       imglib.Image imgImage;
       Uint8List imageBytes;
 
@@ -115,10 +114,7 @@ class _CameraCircleState extends State<CameraCircle> {
       // Uint8List imgImage_ =
       //     Uint8List.fromList(imglib.encodeJpg(imgImage, quality: 80));
       // print('imageBytes size: ${imgImage_.length} bytes');
-      final end_time = DateTime.now();
-      final elapsed_time = end_time.difference(start_time).inMilliseconds;
-      print('function _convertImageToPng pocessing__: $elapsed_time ms');
-      // return imgImage_;
+
       return imageBytes;
     } catch (e) {
       print(">>>>>>>>>>>> ERROR: " + e.toString());
